@@ -143,9 +143,11 @@ This project was **inspired by [Notchy](https://notchy.dev) for macOS**, but it 
 
 ## Download
 
-1. Open the latest successful build on the [Actions page](https://github.com/Navneet035/NotchX/actions) and download the **NotchX** artifact.
-2. Unzip it and run `win-x64\NotchX.exe` (or `win-arm64` on ARM PCs).
+1. Download **NotchX-win-x64.zip** from the [latest release](https://github.com/Navneet035/NotchX/releases/latest) (or `NotchX-win-arm64.zip` for Windows on ARM).
+2. Unzip it and run `NotchX.exe` — no installer and no admin rights needed.
 3. Optional: Settings › General › **Start NotchX with Windows**.
+
+Windows SmartScreen may warn that the app isn't recognised (it isn't code-signed yet); choose **More info › Run anyway**.
 
 Your settings and data are kept in `%APPDATA%\NotchX`.
 
