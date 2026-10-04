@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- The app is called NotchX; the code namespaces keep their original "Notchify" name. -->
+    <AssemblyName>NotchX</AssemblyName>
+    <RootNamespace>Notchify</RootNamespace>
+    <Version>0.2.0</Version>
+    <Product>NotchX</Product>
+    <AssemblyTitle>NotchX</AssemblyTitle>
+    <Authors>Navneet</Authors>
+    <Company>Navneet</Company>
+    <Copyright>© 2026 Navneet</Copyright>
+    <Description>An open-source, fully customizable Dynamic-Island style notch for Windows.</Description>
+    <ApplicationIcon>Assets\NotchX.ico</ApplicationIcon>
+    <!-- Lets the project compile on macOS/Linux CI. It only runs on Windows. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <NoWarn>$(NoWarn);CA1416;NU1701</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WinForms is only used for the tray icon and screen enumeration; keep its namespaces out of the global scope. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\NotchX.ico" />
+    <Resource Include="Assets\NotchX-256.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <PackageReference Include="PDFsharp" Version="6.2.4" />
+    <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,62 @@
+<UserControl x:Class="Notchify.Views.ClipboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:Notchify.Controls">
+    <UserControl.Resources>
+        <c:BoolToVisibility x:Key="Vis" />
+        <c:BoolToVisibility x:Key="NotVis" Invert="True" />
+    </UserControl.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <DockPanel Margin="0,0,0,8">
+            <Button DockPanel.Dock="Right" Style="{StaticResource ChipButton}" Content="Clear" Margin="8,0,0,0" Click="Clear_Click"
+                    ToolTip="Clear history (pinned items are kept)" />
+            <TextBox x:Name="Search" Tag="Search clips, including text inside images…" TextChanged="Search_TextChanged" />
+        </DockPanel>
+        <ListBox x:Name="List" Grid.Row="1" MouseDoubleClick="List_DoubleClick" KeyDown="List_KeyDown">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid Width="34" Height="34" Margin="0,0,10,0">
+                            <Border CornerRadius="7" Visibility="{Binding HasThumbnail, Converter={StaticResource Vis}}">
+                                <Border.Background>
+                                    <ImageBrush ImageSource="{Binding Thumbnail}" Stretch="UniformToFill" />
+                                </Border.Background>
+                            </Border>
+                            <Border CornerRadius="7" Background="{Binding ColorSwatch}" Visibility="{Binding IsColor, Converter={StaticResource Vis}}" />
+                            <TextBlock Style="{StaticResource Icon}" Text="{Binding KindGlyph}" Foreground="{DynamicResource SubtleTextBrush}">
+                                <TextBlock.Visibility>
+                                    <Binding Path="HasThumbnail" Converter="{StaticResource NotVis}" />
+                                </TextBlock.Visibility>
+                            </TextBlock>
+                        </Grid>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Body}" Text="{Binding Preview}" />
+                            <TextBlock Style="{StaticResource Caption}" FontSize="10">
+                                <Run Text="{Binding Age, Mode=OneWay}" /> <Run Text="{Binding SourceApp, Mode=OneWay}" Foreground="{DynamicResource FaintTextBrush}" />
+                            </TextBlock>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Style="{StaticResource ChipButton}" Content="{Binding SmartActionLabel}" Tag="{Binding}" Click="Smart_Click" Margin="0,0,4,0"
+                                    Visibility="{Binding HasSmartAction, Converter={StaticResource Vis}}" Padding="8,3" />
+                            <Button Style="{StaticResource IconButton}" Content="&#xE8C8;" Tag="{Binding}" Click="Copy_Click" ToolTip="Copy" />
+                            <Button Style="{StaticResource IconButton}" Content="&#xE77F;" Tag="{Binding}" Click="Paste_Click" ToolTip="Paste into previous app" />
+                            <Button Style="{StaticResource IconButton}" Content="{Binding PinGlyph}" Tag="{Binding}" Click="Pin_Click" ToolTip="Pin / unpin" />
+                            <Button Style="{StaticResource IconButton}" Content="&#xE74D;" Tag="{Binding}" Click="Delete_Click" ToolTip="Delete" />
+                        </StackPanel>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock x:Name="Empty" Grid.Row="1" Style="{StaticResource Caption}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Text="Copy something — it will land here." />
+    </Grid>
+</UserControl>
