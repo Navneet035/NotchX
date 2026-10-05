@@ -371,6 +371,18 @@ public partial class NotchWindow : Window, INotchShell
         UpdateFill();
     }
 
+    /// <summary>Rise into place: a few pixels up while fading in (used when switching tabs).</summary>
+    private static void Rise(UIElement el, double distance, int ms)
+    {
+        if (!SettingsStore.Current.Appearance.AnimationsEnabled) return;
+        var speed = Math.Max(0.25, SettingsStore.Current.Appearance.AnimationSpeed);
+        if (el.RenderTransform is not TranslateTransform t) el.RenderTransform = t = new TranslateTransform();
+        t.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(distance, 0, TimeSpan.FromMilliseconds(ms / speed))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        });
+    }
+
     private static void Fade(UIElement el, double from, double to, int ms, int delay)
     {
         if (!SettingsStore.Current.Appearance.AnimationsEnabled) { el.Opacity = to; return; }
@@ -1020,7 +1032,8 @@ public partial class NotchWindow : Window, INotchShell
         // With labels only on the open tab, widths change as you switch, so re-fit the row.
         if (SettingsStore.Current.Appearance.TabLabels == "Selected") LayoutTabs();
         else UpdateMoreButton();
-        Fade(TabContent, 0.3, 1, 160, 0);
+        Fade(TabContent, 0.2, 1, 200, 0);
+        Rise(TabContent, 6, 240);
     }
 
     private void SwitchTab(int delta)

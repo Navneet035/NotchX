@@ -157,11 +157,17 @@
                                     <TextBlock x:Name="BatteryText" Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="0,0,4,0" />
                                     <TextBlock x:Name="BatteryGlyph" Style="{StaticResource Icon}" FontSize="15" />
                                 </StackPanel>
-                                <ToggleButton x:Name="CaffeineToggle" Style="{StaticResource IconToggle}" Content="&#xE945;" ToolTip="Keep awake" Click="Caffeine_Click" />
-                                <ToggleButton x:Name="EditToggle" Style="{StaticResource IconToggle}" Content="&#xE70F;" ToolTip="Edit layout: add, arrange and resize Home cards; reorder or hide tabs" Click="Edit_Click" />
-                                <ToggleButton x:Name="PinToggle" Style="{StaticResource IconToggle}" Content="&#xE718;" ToolTip="Keep open" />
-                                <Button Style="{StaticResource IconButton}" Content="&#xE8A7;" ToolTip="Pop out this tab" Click="PopOut_Click" />
-                                <Button Style="{StaticResource IconButton}" Content="&#xE713;" ToolTip="Settings" Click="Settings_Click" />
+                                <!-- Window controls sit together in one glass capsule. -->
+                                <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1"
+                                        CornerRadius="999" Padding="2" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ToggleButton x:Name="CaffeineToggle" Style="{StaticResource IconToggle}" Width="28" Height="28" FontSize="13" Content="&#xE945;" ToolTip="Keep awake" Click="Caffeine_Click" />
+                                        <ToggleButton x:Name="EditToggle" Style="{StaticResource IconToggle}" Width="28" Height="28" FontSize="13" Content="&#xE70F;" ToolTip="Edit layout: add, arrange and resize Home cards; reorder or hide tabs" Click="Edit_Click" />
+                                        <ToggleButton x:Name="PinToggle" Style="{StaticResource IconToggle}" Width="28" Height="28" FontSize="13" Content="&#xE718;" ToolTip="Keep open" />
+                                        <Button Style="{StaticResource IconButton}" Width="28" Height="28" FontSize="13" Content="&#xE8A7;" ToolTip="Pop out this tab" Click="PopOut_Click" />
+                                        <Button Style="{StaticResource IconButton}" Width="28" Height="28" FontSize="13" Content="&#xE713;" ToolTip="Settings" Click="Settings_Click" />
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                             <!-- Tabs wrap onto more rows (Wrap setting, and always while editing the layout). -->
                             <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled" x:Name="TabScroller"

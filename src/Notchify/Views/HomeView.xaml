@@ -47,9 +47,10 @@
                             <TextBlock Style="{StaticResource Title}" FontSize="13">
                                 <Run Text="{Binding Weather.Temperature, Mode=OneWay}" /> <Run Text="{Binding Weather.Condition, Mode=OneWay}" FontWeight="Normal" />
                             </TextBlock>
-                            <TextBlock Style="{StaticResource Caption}">
-                                <Run Text="{Binding Weather.Range, Mode=OneWay}" />  <Run Text="{Binding Weather.Place, Mode=OneWay}" />
-                            </TextBlock>
+                            <!-- High / low and the place on their own lines, so a narrow card doesn't cut them off. -->
+                            <TextBlock Style="{StaticResource Caption}" Text="{Binding Weather.Range, Mode=OneWay}" />
+                            <TextBlock Style="{StaticResource Caption}" Text="{Binding Weather.Place, Mode=OneWay}" Foreground="{DynamicResource FaintTextBrush}" />
+
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>

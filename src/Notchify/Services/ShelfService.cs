@@ -17,7 +17,18 @@ public sealed class ShelfItem : ObservableObject
     public string? CustomIcon { get; set; }
 
     [JsonIgnore] public bool HasCustomIcon => !string.IsNullOrEmpty(CustomIcon);
-    [JsonIgnore] public string Name => System.IO.Path.GetFileName(Path.TrimEnd('\\'));
+    [JsonIgnore]
+    public string Name
+    {
+        get
+        {
+            var name = System.IO.Path.GetFileName(Path.TrimEnd('\\'));
+            // Shortcuts read better as the app's name: "Claude", not "Claude.lnk".
+            var ext = System.IO.Path.GetExtension(name);
+            return ext.Equals(".lnk", StringComparison.OrdinalIgnoreCase) || ext.Equals(".url", StringComparison.OrdinalIgnoreCase)
+                ? System.IO.Path.GetFileNameWithoutExtension(name) : name;
+        }
+    }
     [JsonIgnore] public bool Exists => File.Exists(Path) || Directory.Exists(Path);
     [JsonIgnore] public bool IsImage => ShelfService.ImageExtensions.Contains(System.IO.Path.GetExtension(Path).ToLowerInvariant());
     [JsonIgnore] public bool IsZip => System.IO.Path.GetExtension(Path).Equals(".zip", StringComparison.OrdinalIgnoreCase);
