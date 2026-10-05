@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Notchify.Core;
 
@@ -62,7 +64,7 @@ public partial class NotchWindow : Window, INotchShell
         Header.MouseWheel += Header_MouseWheel;
         Header.SizeChanged += Header_SizeChanged;
         PreviewKeyDown += OnPreviewKeyDown;
-        Deactivated += (_, _) => { if (_state == NotchState.Expanded && !_dragging && !CursorOverPill() && PinToggle.IsChecked != true) Collapse(); };
+        Deactivated += (_, _) => { if (_state == NotchState.Expanded && !_dragging && !_holdForShots && !CursorOverPill() && PinToggle.IsChecked != true) Collapse(); };
         // Any drag that starts inside the notch (windows between desktops, shelf files, launcher tiles, Home cards…)
         // keeps it open until the drop: during a drag Windows stops reporting that the mouse is over us.
         AddHandler(DragDrop.QueryContinueDragEvent, new QueryContinueDragEventHandler(OnQueryContinueDrag), true);
@@ -667,7 +669,7 @@ public partial class NotchWindow : Window, INotchShell
     {
         if (_state != NotchState.Expanded) { _leaveWatch.Stop(); return; }
         var b = SettingsStore.Current.Behavior;
-        var holding = !b.AutoCollapse || PinToggle.IsChecked == true || LayoutEditor.IsEditing || _dragging
+        var holding = !b.AutoCollapse || PinToggle.IsChecked == true || _holdForShots || LayoutEditor.IsEditing || _dragging
             || Mouse.Captured != null || (IsActive && Keyboard.FocusedElement is TextBox);
         if (holding || CursorOverPill())
         {
@@ -683,7 +685,7 @@ public partial class NotchWindow : Window, INotchShell
 
     private void TryAutoCollapse()
     {
-        if (_dragging || CursorOverPill() || _state != NotchState.Expanded) return;
+        if (_dragging || _holdForShots || CursorOverPill() || _state != NotchState.Expanded) return;
         // Don't yank the panel away while the user is typing in it or a popup (combo box) is open.
         if (IsActive && Keyboard.FocusedElement is TextBox) return;
         if (Mouse.Captured != null) return;
@@ -1134,6 +1136,75 @@ public partial class NotchWindow : Window, INotchShell
         if (m == null) return;
         Collapse();
         new DetachedWindow(m).Show();
+    }
+
+    // ---------------- README screenshots ----------------
+
+    /// <summary>
+    /// Developer helper (NotchX.exe --readme-shots &lt;folder&gt;): opens each showcase tab and saves the notch's own
+    /// pixels over a plain backdrop — nothing of the desktop or other windows is captured. Also saves Settings.
+    /// </summary>
+    public async Task SaveReadmeShotsAsync(string folder)
+    {
+        try
+        {
+            Directory.CreateDirectory(folder);
+            await Task.Delay(6000); // let music, weather and devices load first
+            // Hold the notch open without pressing the pin, so the pin doesn't show as "on" in the pictures.
+            _holdForShots = true;
+            foreach (var (file, tab) in new[] { ("home", "home"), ("now-playing", "music"), ("desktops", "desktops"), ("launcher", "launcher"), ("documents", "documents") })
+            {
+                if (Notch.Modules.Tabs.All(t => t.Id != tab)) continue;
+                OpenTab(tab);
+                await Task.Delay(1400);
+                SaveShot(System.IO.Path.Combine(folder, file + ".png"), Pill);
+            }
+            _holdForShots = false;
+            Collapse();
+            await Task.Delay(1400);
+            SaveShot(System.IO.Path.Combine(folder, "pill.png"), Pill);
+
+            ShowSettings("Appearance");
+            await Task.Delay(1500);
+            if (_settings?.Content is FrameworkElement content)
+                SaveShot(System.IO.Path.Combine(folder, "settings.png"), content, (Brush)FindResource("PanelBrush"), pad: 0);
+            _settings?.Close();
+            Log.Info("README screenshots saved to " + folder);
+        }
+        catch (Exception ex) { Log.Error("README screenshots", ex); }
+        finally { _holdForShots = false; }
+    }
+
+    private bool _holdForShots;
+
+    /// <summary>Render an element at 2× over a slate backdrop (the notch hangs from the top edge, with a soft shadow).</summary>
+    private static void SaveShot(string path, FrameworkElement element, Brush? background = null, double pad = 44)
+    {
+        var w = element.ActualWidth;
+        var h = element.ActualHeight;
+        if (w <= 0 || h <= 0) return;
+        var image = new System.Windows.Shapes.Rectangle
+        {
+            Width = w,
+            Height = h,
+            Fill = new VisualBrush(element) { Stretch = Stretch.None, AlignmentX = AlignmentX.Left, AlignmentY = AlignmentY.Top },
+            VerticalAlignment = VerticalAlignment.Top,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(pad, 0, pad, pad),
+        };
+        if (pad > 0) image.Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 26, ShadowDepth = 6, Direction = 270, Opacity = 0.45 };
+        var frame = new Border { Background = background ?? new SolidColorBrush(Color.FromRgb(0x3A, 0x40, 0x58)), Child = image };
+        var size = new Size(w + pad * 2, h + pad);
+        frame.Measure(size);
+        frame.Arrange(new Rect(size));
+        frame.UpdateLayout();
+        const double scale = 2;
+        var bitmap = new RenderTargetBitmap((int)Math.Ceiling(size.Width * scale), (int)Math.Ceiling(size.Height * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
+        bitmap.Render(frame);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(path);
+        encoder.Save(stream);
     }
 
     private SettingsWindow? _settings;

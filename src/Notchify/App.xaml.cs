@@ -64,6 +64,10 @@ public partial class App : Application
         SettingsStore.Changed += () => { RegisterHotkeys(); ApplyStartup(); UpdateTray(); };
 
         Log.Info($"{AppInfo.Name} {AppInfo.Version} started");
+
+        // Developer helper: NotchX.exe --readme-shots <folder> saves fresh screenshots for the README.
+        var shots = Array.IndexOf(e.Args, "--readme-shots");
+        if (shots >= 0 && shots + 1 < e.Args.Length) _ = window.SaveReadmeShotsAsync(e.Args[shots + 1]);
     }
 
     /// <summary>Start a fresh copy and quit this one.</summary>
