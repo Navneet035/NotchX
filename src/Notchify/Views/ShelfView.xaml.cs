@@ -121,4 +121,6 @@ public partial class ShelfView : UserControl
     private void Reveal_Click(object sender, RoutedEventArgs e) { if (Item(sender) is { } i) Ui.RevealInExplorer(i.Path); }
     private void CopyPath_Click(object sender, RoutedEventArgs e) { if (Item(sender) is { } i) Notch.Clipboard.SetTextSilently(i.Path); }
     private void Remove_Click(object sender, RoutedEventArgs e) { if (Item(sender) is { } i) Notch.Shelf.Remove(i); }
+    private void ChangeIcon_Click(object sender, RoutedEventArgs e) { if (Item(sender) is { } i && Ui.PickIcon() is { } icon) Notch.Shelf.SetIcon(i, icon); }
+    private void ResetIcon_Click(object sender, RoutedEventArgs e) { if (Item(sender) is { } i) Notch.Shelf.SetIcon(i, null); }
 }

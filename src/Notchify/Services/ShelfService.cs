@@ -13,13 +13,21 @@ public sealed class ShelfItem : ObservableObject
     private bool _selected;
     public string Path { get; set; } = "";
     public DateTime Added { get; set; } = DateTime.Now;
+    /// <summary>Optional user-chosen icon (image, .ico, or an exe/shortcut to borrow from).</summary>
+    public string? CustomIcon { get; set; }
 
+    [JsonIgnore] public bool HasCustomIcon => !string.IsNullOrEmpty(CustomIcon);
     [JsonIgnore] public string Name => System.IO.Path.GetFileName(Path.TrimEnd('\\'));
     [JsonIgnore] public bool Exists => File.Exists(Path) || Directory.Exists(Path);
     [JsonIgnore] public bool IsImage => ShelfService.ImageExtensions.Contains(System.IO.Path.GetExtension(Path).ToLowerInvariant());
     [JsonIgnore] public bool IsZip => System.IO.Path.GetExtension(Path).Equals(".zip", StringComparison.OrdinalIgnoreCase);
     [JsonIgnore] public bool IsPdf => System.IO.Path.GetExtension(Path).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
-    [JsonIgnore] public ImageSource? Thumbnail => IsImage ? Ui.LoadImage(Path, 120) ?? Ui.FileIcon(Path) : Ui.FileIcon(Path);
+    [JsonIgnore]
+    public ImageSource? Thumbnail =>
+        HasCustomIcon ? Ui.ItemIcon(CustomIcon, Path) :
+        IsImage ? Ui.LoadImage(Path, 120) ?? Ui.FileIcon(Path) : Ui.FileIcon(Path);
+
+    internal void IconChanged() { Raise(nameof(Thumbnail)); Raise(nameof(HasCustomIcon)); }
     [JsonIgnore] public bool Selected { get => _selected; set => Set(ref _selected, value); }
     [JsonIgnore]
     public string SizeText
@@ -60,8 +68,17 @@ public sealed class ShelfService
         Save();
     }
 
+    public void SetIcon(ShelfItem item, string? icon)
+    {
+        Ui.ForgetIcon(item.CustomIcon);
+        item.CustomIcon = icon;
+        item.IconChanged();
+        Save();
+    }
+
     public void Remove(ShelfItem item)
     {
+        Ui.ForgetIcon(item.CustomIcon);
         Items.Remove(item);
         // Files Notchify created itself (captures, conversions) are cleaned up with the shelf entry.
         if (item.Path.StartsWith(Paths.Shelf, StringComparison.OrdinalIgnoreCase))

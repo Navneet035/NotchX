@@ -46,6 +46,7 @@ public static class Paths
     public static string Clips { get; } = Ensure(Path.Combine(Root, "clips"));
     public static string Shelf { get; } = Ensure(Path.Combine(Root, "shelf"));
     public static string Cache { get; } = Ensure(Path.Combine(Root, "cache"));
+    public static string Icons { get; } = Ensure(Path.Combine(Root, "icons"));
     public static string SettingsFile => Path.Combine(Root, "settings.json");
 
     public static string UserProfile => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);

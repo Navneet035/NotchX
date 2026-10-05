@@ -16,7 +16,9 @@ public sealed class LauncherApp
     public string Name { get; set; } = "";
     public string Path { get; set; } = "";
     public string Args { get; set; } = "";
-    [JsonIgnore] public ImageSource? Icon => Ui.FileIcon(Path);
+    /// <summary>Optional user-chosen icon (image, .ico, or an exe/shortcut to borrow from).</summary>
+    public string? CustomIcon { get; set; }
+    [JsonIgnore] public ImageSource? Icon => Ui.ItemIcon(CustomIcon, Path);
 }
 
 /// <summary>App Launcher: pin go-to apps and open them with one tap. Add from a Start-menu picker or drop shortcuts in.</summary>
@@ -100,7 +102,14 @@ public sealed class LauncherModule : NotchModule
                 Item("Move left", () => { var i = Apps.IndexOf(a); if (i > 0) Apps.Move(i, i - 1); });
                 Item("Move right", () => { var i = Apps.IndexOf(a); if (i < Apps.Count - 1) Apps.Move(i, i + 1); });
                 Item("Run as administrator", () => { try { Process.Start(new ProcessStartInfo(a.Path) { UseShellExecute = true, Verb = "runas" }); } catch { } });
-                Item("Remove", () => Apps.Remove(a));
+                Item("Change icon…", () =>
+                {
+                    if (Ui.PickIcon() is not { } icon) return;
+                    Ui.ForgetIcon(a.CustomIcon);
+                    a.CustomIcon = icon;
+                });
+                if (a.CustomIcon != null) Item("Reset icon", () => { Ui.ForgetIcon(a.CustomIcon); a.CustomIcon = null; });
+                Item("Remove", () => { Ui.ForgetIcon(a.CustomIcon); Apps.Remove(a); });
                 tile.ContextMenu = menu;
                 // Drag a tile onto another to reorder. Only start once the mouse has really moved,
                 // otherwise the drag swallows the click and the app never launches.

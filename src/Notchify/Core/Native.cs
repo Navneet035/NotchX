@@ -130,6 +130,51 @@ public static class Native
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     public static extern int SHGetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] Guid id, uint flags, IntPtr token, out string path);
 
+    public const uint SHGFI_ICON = 0x100, SHGFI_LARGEICON = 0x0;
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct SHFILEINFO
+    {
+        public IntPtr hIcon;
+        public int iIcon;
+        public uint dwAttributes;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string szDisplayName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)] public string szTypeName;
+    }
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr SHGetFileInfo(string path, uint attributes, ref SHFILEINFO info, uint size, uint flags);
+    [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr hIcon);
+
+    // ---------- Window list (Desktops tab) ----------
+    public const int WS_EX_APPWINDOW = 0x00040000;
+    public const uint GW_OWNER = 4;
+    public const int WM_GETICON = 0x007F, ICON_BIG = 1, ICON_SMALL2 = 2;
+    public const int GCLP_HICON = -14;
+    public const int DWMWA_CLOAKED = 14;
+    [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hWnd, uint cmd);
+    [DllImport("user32.dll")] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam, uint flags, uint timeout, out IntPtr result);
+    [DllImport("user32.dll", EntryPoint = "GetClassLongPtrW")] public static extern IntPtr GetClassLongPtr(IntPtr hWnd, int index);
+    [DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr parent, EnumWindowsProc fn, IntPtr lParam);
+    [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attr, out int value, int size);
+    [DllImport("user32.dll")] public static extern void SwitchToThisWindow(IntPtr hWnd, bool altTab);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    public static extern bool QueryFullProcessImageName(IntPtr process, int flags, StringBuilder name, ref int size);
+    [DllImport("kernel32.dll")] public static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+    [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr handle);
+    public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+    public static string? GetProcessPath(uint pid)
+    {
+        var h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (h == IntPtr.Zero) return null;
+        try
+        {
+            var sb = new StringBuilder(1024);
+            var size = sb.Capacity;
+            return QueryFullProcessImageName(h, 0, sb, ref size) ? sb.ToString() : null;
+        }
+        finally { CloseHandle(h); }
+    }
+
     [DllImport("dwmapi.dll")] public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
     public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
     public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;

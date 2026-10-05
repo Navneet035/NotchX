@@ -55,6 +55,8 @@
                                 <MenuItem Header="Open" Click="Open_Click" />
                                 <MenuItem Header="Show in folder" Click="Reveal_Click" />
                                 <MenuItem Header="Copy path" Click="CopyPath_Click" />
+                                <MenuItem Header="Change icon…" Click="ChangeIcon_Click" />
+                                <MenuItem Header="Reset icon" Click="ResetIcon_Click" IsEnabled="{Binding HasCustomIcon}" />
                                 <MenuItem Header="Remove from shelf" Click="Remove_Click" />
                             </ContextMenu>
                         </StackPanel.ContextMenu>

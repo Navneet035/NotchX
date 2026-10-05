@@ -82,7 +82,7 @@ public static class Ui
 
     private static readonly Dictionary<string, ImageSource?> IconCache = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Shell icon for an exe, shortcut, or any file.</summary>
+    /// <summary>Shell icon for an exe, shortcut, folder, or any file.</summary>
     public static ImageSource? FileIcon(string path)
     {
         if (string.IsNullOrEmpty(path)) return null;
@@ -92,19 +92,71 @@ public static class Ui
         {
             if (File.Exists(path) || Directory.Exists(path))
             {
-                using var icon = System.Drawing.Icon.ExtractAssociatedIcon(path);
-                if (icon != null)
+                // The shell knows folder icons (Documents, Downloads…); ExtractAssociatedIcon only does files.
+                var info = new Native.SHFILEINFO();
+                if (Native.SHGetFileInfo(path, 0, ref info, (uint)System.Runtime.InteropServices.Marshal.SizeOf(info),
+                        Native.SHGFI_ICON | Native.SHGFI_LARGEICON) != IntPtr.Zero && info.hIcon != IntPtr.Zero)
                 {
-                    var src = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(
-                        icon.Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-                    src.Freeze();
-                    result = src;
+                    try { result = FromHIcon(info.hIcon); }
+                    finally { Native.DestroyIcon(info.hIcon); }
+                }
+                else if (File.Exists(path))
+                {
+                    using var icon = System.Drawing.Icon.ExtractAssociatedIcon(path);
+                    if (icon != null) result = FromHIcon(icon.Handle);
                 }
             }
         }
         catch { }
         IconCache[path] = result;
         return result;
+    }
+
+    public static ImageSource FromHIcon(IntPtr hIcon)
+    {
+        var src = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+        src.Freeze();
+        return src;
+    }
+
+    /// <summary>A user-chosen icon (image, .ico, or an exe/shortcut to borrow from), else the item's own shell icon.</summary>
+    public static ImageSource? ItemIcon(string? customIcon, string path)
+    {
+        if (!string.IsNullOrEmpty(customIcon))
+        {
+            var ext = Path.GetExtension(customIcon).ToLowerInvariant();
+            var custom = ext is ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif" or ".ico" or ".webp"
+                ? LoadImage(customIcon, 96) : FileIcon(customIcon);
+            if (custom != null) return custom;
+        }
+        return FileIcon(path);
+    }
+
+    /// <summary>Ask for an icon file and keep a private copy of it, so moving the original doesn't break it.</summary>
+    public static string? PickIcon()
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choose an icon",
+            Filter = "Icons and images|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.ico;*.webp|Borrow from a program or shortcut|*.exe;*.lnk|All files|*.*",
+        };
+        if (dlg.ShowDialog() != true) return null;
+        var ext = Path.GetExtension(dlg.FileName).ToLowerInvariant();
+        if (ext is ".exe" or ".lnk") return dlg.FileName; // the shell reads the icon out of these
+        try
+        {
+            var copy = Path.Combine(Paths.Icons, $"{Guid.NewGuid():N}{ext}");
+            File.Copy(dlg.FileName, copy);
+            return copy;
+        }
+        catch (Exception ex) { Log.Error("copy icon", ex); return dlg.FileName; }
+    }
+
+    /// <summary>Delete a private icon copy made by <see cref="PickIcon"/> (no-op for anything else).</summary>
+    public static void ForgetIcon(string? customIcon)
+    {
+        if (string.IsNullOrEmpty(customIcon) || !customIcon.StartsWith(Paths.Icons, StringComparison.OrdinalIgnoreCase)) return;
+        try { File.Delete(customIcon); } catch { }
     }
 
     public static string FormatBytes(double bytes)
