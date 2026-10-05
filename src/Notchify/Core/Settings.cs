@@ -266,6 +266,10 @@ public sealed class AiUsageSettings
     /// <summary>Token budget per 5-hour Claude window used for the progress ring and alerts (0 = no alert).</summary>
     public long ClaudeWindowTokenBudget { get; set; } = 0;
     public int AlertAtPercent { get; set; } = 85;
+    /// <summary>Show a usage chip ("Claude 42%") on the closed notch.</summary>
+    public bool ShowInNotch { get; set; } = true;
+    /// <summary>Which apps get a chip on the closed notch: any of claude, codex, copilot.</summary>
+    public List<string> NotchProviders { get; set; } = new() { "claude" };
     /// <summary>GitHub token for Copilot quota, encrypted with Windows DPAPI.</summary>
     public string CopilotTokenProtected { get; set; } = "";
     public string CursorTokenProtected { get; set; } = "";

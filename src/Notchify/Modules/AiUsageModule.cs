@@ -24,10 +24,18 @@ public sealed class AiUsageModule : NotchModule
     protected override void Start()
     {
         _refresh.Start();
+        SettingsStore.Changed += OnSettingsChanged;
         _ = Notch.AiUsage.RefreshAsync();
     }
 
-    protected override void Stop() => _refresh.Stop();
+    protected override void Stop()
+    {
+        _refresh.Stop();
+        SettingsStore.Changed -= OnSettingsChanged;
+        Ui.Post(Notch.AiUsage.RemoveNotchChips);
+    }
+
+    private static void OnSettingsChanged() => Ui.Post(Notch.AiUsage.UpdateNotchChips);
 
     public override FrameworkElement CreateView()
     {

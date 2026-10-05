@@ -9,6 +9,8 @@ public sealed class ProviderUsage : ObservableObject
 {
     public string Id { get; init; } = "";
     public string Name { get; init; } = "";
+    /// <summary>One word for the closed-notch chip.</summary>
+    public string ShortName { get; init; } = "";
     public string Glyph { get; init; } = Glyphs.Robot;
     public bool Available { get; set; }
     public string Status { get; set; } = "";
@@ -48,11 +50,58 @@ public sealed class AiUsageService
 
     public List<ProviderUsage> Providers { get; } = new()
     {
-        new() { Id = "claude", Name = "Claude Code", Glyph = Glyphs.Robot },
-        new() { Id = "codex", Name = "Codex", Glyph = Glyphs.Code },
-        new() { Id = "copilot", Name = "GitHub Copilot", Glyph = Glyphs.Code },
-        new() { Id = "cursor", Name = "Cursor", Glyph = Glyphs.Edit },
+        new() { Id = "claude", Name = "Claude Code", ShortName = "Claude", Glyph = Glyphs.Robot },
+        new() { Id = "codex", Name = "Codex", ShortName = "Codex", Glyph = Glyphs.Code },
+        new() { Id = "copilot", Name = "GitHub Copilot", ShortName = "Copilot", Glyph = Glyphs.Code },
+        new() { Id = "cursor", Name = "Cursor", ShortName = "Cursor", Glyph = Glyphs.Edit },
     };
+
+    /// <summary>Apps that can have a closed-notch chip (Cursor has no data source yet).</summary>
+    public IEnumerable<ProviderUsage> ChipProviders => Providers.Where(p => p.Id != "cursor");
+
+    /// <summary>
+    /// Put a usage chip on the closed notch for each chosen app: "Claude 42%" with a small bar, green → orange
+    /// at the alert threshold → red at the limit. Hover for the details. Call on the UI thread.
+    /// </summary>
+    public void UpdateNotchChips()
+    {
+        var s = SettingsStore.Current.AiUsage;
+        var threshold = s.AlertAtPercent / 100.0;
+        foreach (var p in Providers)
+        {
+            var id = "ai-usage-" + p.Id;
+            if (!s.ShowInNotch || !s.NotchProviders.Contains(p.Id) || !p.Available)
+            {
+                Notch.Hub.Remove(id);
+                continue;
+            }
+            Notch.Hub.Upsert(id, a =>
+            {
+                a.Glyph = p.Glyph;
+                a.OpenTab = "ai";
+                a.Priority = 5; // below music, timers and running agents
+                if (p.WindowUsed is { } used)
+                {
+                    a.Text = $"{p.ShortName} {used * 100:0}%";
+                    a.Progress = Math.Min(1, used);
+                    a.Accent = used >= 1 ? Ui.Red : used >= threshold ? Ui.Orange : Ui.Green;
+                }
+                else
+                {
+                    a.Text = $"{p.ShortName} –";
+                    a.Progress = null;
+                    a.Accent = Ui.Gray;
+                }
+                a.Detail = string.Join("\n", new[] { p.Name, p.WindowLabel, p.WindowResets, p.WeeklyLabel, p.Status }
+                    .Where(x => !string.IsNullOrWhiteSpace(x)));
+            });
+        }
+    }
+
+    public void RemoveNotchChips()
+    {
+        foreach (var p in Providers) Notch.Hub.Remove("ai-usage-" + p.Id);
+    }
 
     public event Action? Updated;
 
@@ -70,6 +119,7 @@ public sealed class AiUsageService
 
         foreach (var p in Providers) p.Changed();
         Alert();
+        Ui.Post(UpdateNotchChips);
         Updated?.Invoke();
     }
 

@@ -236,6 +236,12 @@ public sealed class SettingsWindow : Window
         return sp;
     }
 
+    private static StackPanel Indented(StackPanel panel)
+    {
+        panel.Margin = new Thickness(24, 0, 0, 0);
+        return panel;
+    }
+
     private static void PreviewHome() { Notch.Shell.OpenTab("home"); }
 
     // ---------------- General ----------------
@@ -716,6 +722,13 @@ public sealed class SettingsWindow : Window
             Slide("Claude 5-hour token budget (millions)", 0, 200, () => ai.ClaudeWindowTokenBudget / 1_000_000.0, v => ai.ClaudeWindowTokenBudget = (long)(v * 1_000_000), "0.#",
                 hint: "Used for the progress ring and alerts. 0 = don't track."),
             Slide("Alert when a window reaches", 50, 100, () => ai.AlertAtPercent, v => ai.AlertAtPercent = (int)v, "0'%'"),
+            Header("Closed notch", "A small chip like “Claude 42%” — green, orange at the alert level, red at the limit. Hover it for reset times; click to open AI Usage."),
+            Toggle("Show usage in the closed notch", () => ai.ShowInNotch, v => ai.ShowInNotch = v),
+            Indented(Page(Notch.AiUsage.ChipProviders.Select(p => Toggle(p.Name, () => ai.NotchProviders.Contains(p.Id), v =>
+            {
+                ai.NotchProviders.Remove(p.Id);
+                if (v) ai.NotchProviders.Add(p.Id);
+            }, tip: p.Available ? null : $"{p.Name} isn't set up on this PC yet, so its chip stays hidden")).ToArray())),
             Row("GitHub token (Copilot)", token, "Stored encrypted with Windows DPAPI"),
             Header("Prices", "Per-million-token prices used for cost estimates live in settings.json → AiUsage.Prices."));
     }
