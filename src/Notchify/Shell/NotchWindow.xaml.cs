@@ -60,7 +60,10 @@ public partial class NotchWindow : Window, INotchShell
         LayoutEditor.Changed += OnLayoutEditChanged;
         Header.MouseWheel += Header_MouseWheel;
         PreviewKeyDown += OnPreviewKeyDown;
-        Deactivated += (_, _) => { if (_state == NotchState.Expanded && !Pill.IsMouseOver && PinToggle.IsChecked != true) Collapse(); };
+        Deactivated += (_, _) => { if (_state == NotchState.Expanded && !_dragging && !CursorOverPill() && PinToggle.IsChecked != true) Collapse(); };
+        // Any drag that starts inside the notch (windows between desktops, shelf files, launcher tiles, Home cards…)
+        // keeps it open until the drop: during a drag Windows stops reporting that the mouse is over us.
+        AddHandler(DragDrop.QueryContinueDragEvent, new QueryContinueDragEventHandler(OnQueryContinueDrag), true);
 
         Notch.Hub.PropertyChanged += Hub_PropertyChanged;
         Notch.Hub.Activities.CollectionChanged += Activities_CollectionChanged;
@@ -556,16 +559,54 @@ public partial class NotchWindow : Window, INotchShell
         if (_state == NotchState.Island) Notch.Hub.HoldCurrent = false;
         if (_peeking) { _peeking = false; Notch.Hub.DismissByKey("peek"); }
         var b = SettingsStore.Current.Behavior;
-        if (_state == NotchState.Expanded && b.AutoCollapse && PinToggle.IsChecked != true)
+        if (_state == NotchState.Expanded && b.AutoCollapse && PinToggle.IsChecked != true && !_dragging)
         {
             _collapseTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(100, b.AutoCollapseDelayMs));
             _collapseTimer.Start();
         }
     }
 
+    private bool _dragging;
+
+    private void OnQueryContinueDrag(object sender, QueryContinueDragEventArgs e)
+    {
+        var ending = e.EscapePressed || (e.KeyStates & DragDropKeyStates.LeftMouseButton) == 0;
+        if (!ending)
+        {
+            if (!_dragging) { _dragging = true; _collapseTimer.Stop(); }
+            return;
+        }
+        if (!_dragging) return;
+        _dragging = false;
+        // Dropped: give a moment to start the next drag before closing (at least a second).
+        var b = SettingsStore.Current.Behavior;
+        if (_state == NotchState.Expanded && b.AutoCollapse && PinToggle.IsChecked != true)
+        {
+            _collapseTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(1000, b.AutoCollapseDelayMs));
+            _collapseTimer.Start();
+        }
+    }
+
+    /// <summary>
+    /// Mouse over the pill, checked against the real cursor position: WPF's IsMouseOver goes stale during and
+    /// right after drag and drop.
+    /// </summary>
+    private bool CursorOverPill()
+    {
+        if (Pill.IsMouseOver) return true;
+        if (!Pill.IsVisible || !Native.GetCursorPos(out var p)) return false;
+        try
+        {
+            var topLeft = Pill.PointToScreen(new Point(0, 0));
+            var bottomRight = Pill.PointToScreen(new Point(Pill.ActualWidth, Pill.ActualHeight));
+            return p.X >= topLeft.X && p.X <= bottomRight.X && p.Y >= topLeft.Y && p.Y <= bottomRight.Y;
+        }
+        catch { return false; }
+    }
+
     private void TryAutoCollapse()
     {
-        if (Pill.IsMouseOver || _state != NotchState.Expanded) return;
+        if (_dragging || CursorOverPill() || _state != NotchState.Expanded) return;
         // Don't yank the panel away while the user is typing in it or a popup (combo box) is open.
         if (IsActive && Keyboard.FocusedElement is TextBox) return;
         if (Mouse.Captured != null) return;
