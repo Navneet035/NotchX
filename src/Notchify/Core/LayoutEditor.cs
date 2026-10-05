@@ -57,6 +57,7 @@ public static class LayoutEditor
         new("camera", "Camera", Glyphs.Camera, "A mirror from your webcam (only while visible)", 3, 2),
         new("screentime", "Screen time", Glyphs.Chart, "Time on this PC today, and your top apps", 3, 2),
         new("spaces", "Spaces", Glyphs.Apps, "Virtual desktops: see where you are, switch, add", 3, 1),
+        new("world", "World clocks", Glyphs.Globe, "Time and weather in your places (Settings › Weather), with how far ahead or behind they are", 3, 2),
         new("windows", "Open windows", Glyphs.TaskView, "Apps and windows open on this desktop — click one to jump to it", 3, 2),
         new("timer", "Timer", Glyphs.Stopwatch, "Pomodoro countdown with start / pause", 2, 2),
         new("system", "System", Glyphs.Chart, "CPU, memory and network", 3, 1),

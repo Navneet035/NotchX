@@ -31,6 +31,7 @@ public static class HomeCards
         "screentime" => ScreenTime(),
         "spaces" => Spaces(),
         "windows" => OpenWindows(),
+        "world" => WorldClocks(),
         "timer" => Timer(),
         "system" => SystemStats(),
         "launcher" => Launcher(),
@@ -409,6 +410,82 @@ public static class HomeCards
         };
         var card = CardOf(Columns((Icon(Glyphs.Apps, 18), Px(30)), (info, Star()), (buttons, Auto)));
         WhileVisible(card, sp.Acquire, sp.Release);
+        return card;
+    }
+
+    /// <summary>
+    /// One row per place: name, local time (in the user's clock format), how far ahead or behind it is, and the
+    /// weather. Rows are tinted warm by day and indigo by night. Ticks only while visible.
+    /// </summary>
+    private static FrameworkElement WorldClocks()
+    {
+        var weather = Notch.Weather;
+        var rows = new StackPanel();
+        var empty = Faint("Add cities in Settings › Weather to see their time and weather here.");
+        var settings = Small(Glyphs.Settings, "Edit places", () => Notch.Shell.ShowSettings("Weather"));
+        var dayTint = new LinearGradientBrush(Color.FromArgb(0x26, 0xFF, 0xC8, 0x6E), Color.FromArgb(0x08, 0x6E, 0xB4, 0xFF), 0);
+        var nightTint = new LinearGradientBrush(Color.FromArgb(0x30, 0x4B, 0x3C, 0xB4), Color.FromArgb(0x0A, 0x14, 0x1E, 0x50), 0);
+        dayTint.Freeze();
+        nightTint.Freeze();
+        var tick = new DispatcherTimer();
+        var clocks = new List<(TextBlock Time, TextBlock Diff, Border Row, PlaceWeather? Weather, WeatherPlace Place)>();
+
+        void Build()
+        {
+            rows.Children.Clear();
+            clocks.Clear();
+            var places = SettingsStore.Current.Weather.Places;
+            empty.Visibility = places.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            foreach (var place in places)
+            {
+                var pw = weather.World.FirstOrDefault(x => x.Place.Latitude == place.Latitude && x.Place.Longitude == place.Longitude);
+                var name = Text(place.Name, "Body", 12.5);
+                name.FontWeight = FontWeights.SemiBold;
+                var diff = Text("", "Caption", 10.5);
+                var left = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { name, diff } };
+                var temp = Text(pw == null ? "" : $"{pw.Icon} {pw.Temperature}", "Body", 12);
+                temp.FontFamily = new FontFamily("Segoe UI Emoji, Segoe UI Variable Text");
+                temp.VerticalAlignment = VerticalAlignment.Center;
+                temp.Margin = new Thickness(8, 0, 10, 0);
+                temp.ToolTip = pw?.Condition;
+                var time = Text("", "Title", 15);
+                time.Typography.NumeralAlignment = FontNumeralAlignment.Tabular;
+                time.VerticalAlignment = VerticalAlignment.Center;
+                var row = new Border
+                {
+                    CornerRadius = new CornerRadius(10),
+                    Padding = new Thickness(10, 5, 10, 5),
+                    Margin = new Thickness(0, 0, 0, 4),
+                    Child = Columns((left, Star()), (temp, Auto), (time, Auto)),
+                    ToolTip = place.FullName,
+                };
+                rows.Children.Add(row);
+                clocks.Add((time, diff, row, pw, place));
+            }
+            Tick();
+        }
+
+        void Tick()
+        {
+            foreach (var c in clocks)
+            {
+                var now = c.Weather?.Now ?? PlaceTime.Now(c.Place);
+                c.Time.Text = ClockFormat.Time(now.DateTime);
+                c.Diff.Text = PlaceTime.Difference(now);
+                // Day/night from the forecast when we have it, else from the local hour.
+                var isDay = c.Weather?.IsDay ?? now.Hour is >= 7 and < 19;
+                c.Row.Background = isDay ? dayTint : nightTint;
+            }
+            tick.Interval = ClockFormat.TickInterval;
+        }
+        tick.Tick += (_, _) => Tick();
+
+        var head = Header("World clocks", settings);
+        var card = CardOf(Layout(head, ScrollList(new StackPanel { Children = { rows, empty } })));
+        void OnWorld() => Ui.Post(Build);
+        WhileVisible(card,
+            () => { weather.WorldUpdated += OnWorld; Build(); tick.Start(); _ = weather.RefreshWorldAsync(); },
+            () => { weather.WorldUpdated -= OnWorld; tick.Stop(); });
         return card;
     }
 

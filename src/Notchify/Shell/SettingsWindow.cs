@@ -313,6 +313,26 @@ public sealed class SettingsWindow : Window
         return sp;
     }
 
+    /// <summary>Colour and strength of the selected tab's capsule.</summary>
+    private static UIElement TabTintSection(Action preview)
+    {
+        var a = S.Appearance;
+        var picker = ColorPick("Highlight colour", () => string.IsNullOrWhiteSpace(a.TabTintColor) ? a.AccentColor : a.TabTintColor,
+            v => a.TabTintColor = v, preview);
+        picker.Visibility = string.IsNullOrWhiteSpace(a.TabTintColor) ? Visibility.Collapsed : Visibility.Visible;
+        return Page(
+            Header("Tab highlight", "The capsule behind the open tab (and the open page in this sidebar)."),
+            Toggle("Match the accent colour", () => string.IsNullOrWhiteSpace(a.TabTintColor), v =>
+            {
+                // Turning it off starts the custom colour from the accent, so nothing jumps.
+                a.TabTintColor = v ? "" : a.AccentColor;
+                picker.Visibility = v ? Visibility.Collapsed : Visibility.Visible;
+            }, preview),
+            picker,
+            Slide("Strength", 0.05, 1, () => a.TabTintStrength, v => a.TabTintStrength = v, "0%", preview,
+                "Low = a soft glassy tint; high = a solid capsule (the name turns white or black to stay readable)"));
+    }
+
     /// <summary>Clock options, with a live sample of the result.</summary>
     private static UIElement ClockSection(Action preview)
     {
@@ -424,6 +444,7 @@ public sealed class SettingsWindow : Window
                 () => a.TabLabels, v => a.TabLabels = v, PreviewExpanded, "Names under the tab icons"),
             Choice("Tabs that don't fit", new[] { ("Show them on a second row", "Wrap"), ("Put them in a More ▾ menu", "Menu") },
                 () => a.TabOverflow, v => a.TabOverflow = v, PreviewExpanded, "A second row makes the open notch taller so the page keeps its space"),
+            TabTintSection(PreviewExpanded),
             ClockSection(PreviewExpanded),
             Header("Frosted glass", "Blurs whatever is behind the open notch, like Windows 11's own flyouts."),
             Toggle("Frosted glass", () => a.Glass, v => a.Glass = v, PreviewExpanded),
@@ -674,12 +695,140 @@ public sealed class SettingsWindow : Window
     private UIElement Weather()
     {
         var w = S.Weather;
+        static void RefreshAll()
+        {
+            _ = Notch.Weather.RefreshAsync();
+            _ = Notch.Weather.RefreshWorldAsync(force: true);
+        }
+
+        // ----- your places: first = main weather; reorder or remove -----
+        var list = new StackPanel();
+        void RenderPlaces()
+        {
+            list.Children.Clear();
+            if (w.Places.Count == 0)
+            {
+                list.Children.Add(Note("No places yet — NotchX uses Windows location for the weather. Search below to add one."));
+                return;
+            }
+            for (var i = 0; i < w.Places.Count; i++)
+            {
+                var index = i;
+                var p = w.Places[i];
+                var name = Text(p.Name, "Body", 13);
+                var title = new StackPanel { Orientation = Orientation.Horizontal, Children = { name } };
+                if (i == 0)
+                {
+                    var badge = new Border
+                    {
+                        CornerRadius = new CornerRadius(6), Padding = new Thickness(6, 1, 6, 1), Margin = new Thickness(8, 0, 0, 0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Child = new TextBlock { Text = "Main", FontSize = 10, Foreground = Brushes.Black },
+                    };
+                    badge.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
+                    title.Children.Add(badge);
+                }
+                var info = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { title, Text(p.Subtitle, "Caption") } };
+                Button Small(string glyph, string tip, Action run, bool enabled = true)
+                {
+                    var b = IconButton(glyph, tip, (_, _) => { run(); SettingsStore.Save(); Changed(RefreshAll); RenderPlaces(); });
+                    b.Width = b.Height = 26;
+                    b.FontSize = 11;
+                    b.IsEnabled = enabled;
+                    return b;
+                }
+                var buttons = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center,
+                    Children =
+                    {
+                        Small(Glyphs.Up, "Move up (the top one is your main weather)", () => (w.Places[index - 1], w.Places[index]) = (w.Places[index], w.Places[index - 1]), index > 0),
+                        Small(Glyphs.Down, "Move down", () => (w.Places[index + 1], w.Places[index]) = (w.Places[index], w.Places[index + 1]), index < w.Places.Count - 1),
+                        Small(Glyphs.Close, "Remove", () => w.Places.RemoveAt(index)),
+                    },
+                };
+                list.Children.Add(Card(Columns((info, Star()), (buttons, Auto)), new Thickness(0, 0, 0, 6)));
+            }
+        }
+        RenderPlaces();
+
+        // ----- search with suggestions as you type -----
+        var search = new TextBox { Tag = "Search for a city… (e.g. Calgary, Mumbai, London)" };
+        var results = new ListBox { MaxHeight = 240, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 6, 0, 0) };
+        var status = Text("", "Caption");
+        status.Margin = new Thickness(2, 4, 0, 0);
+        var debounce = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+        CancellationTokenSource? pending = null;
+
+        void Add(WeatherPlace place)
+        {
+            var exists = w.Places.Any(p => Math.Abs(p.Latitude - place.Latitude) < 0.01 && Math.Abs(p.Longitude - place.Longitude) < 0.01);
+            if (!exists) w.Places.Add(place);
+            search.Text = "";
+            results.Visibility = Visibility.Collapsed;
+            status.Text = exists ? $"{place.Name} is already in your list." : $"Added {place.FullName}.";
+            SettingsStore.Save();
+            Changed(RefreshAll);
+            RenderPlaces();
+        }
+
+        search.TextChanged += (_, _) => { debounce.Stop(); debounce.Start(); };
+        debounce.Tick += async (_, _) =>
+        {
+            debounce.Stop();
+            pending?.Cancel();
+            var query = search.Text.Trim();
+            if (query.Length < 2) { results.Visibility = Visibility.Collapsed; status.Text = ""; return; }
+            pending = new CancellationTokenSource();
+            try
+            {
+                status.Text = "Searching…";
+                var found = await WeatherService.SearchPlacesAsync(query, pending.Token);
+                if (search.Text.Trim() != query) return; // typed more in the meantime
+                results.Items.Clear();
+                foreach (var place in found)
+                {
+                    var item = new ListBoxItem { Tag = place, Cursor = Cursors.Hand };
+                    var line = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis };
+                    line.Inlines.Add(new System.Windows.Documents.Run(place.Name) { FontWeight = FontWeights.SemiBold });
+                    if (place.Subtitle.Length > 0)
+                        line.Inlines.Add(new System.Windows.Documents.Run("  " + place.Subtitle) { Foreground = (Brush)Application.Current.FindResource("SubtleTextBrush") });
+                    item.Content = line;
+                    item.PreviewMouseLeftButtonUp += (_, _) => Add(place);
+                    item.KeyDown += (_, e) => { if (e.Key == Key.Enter) Add(place); };
+                    results.Items.Add(item);
+                }
+                results.Visibility = found.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+                status.Text = found.Count > 0 ? "Pick a city to add it." : $"No cities match “{query}”.";
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                status.Text = "Couldn't search — are you online?";
+                Log.Info("city search: " + ex.Message);
+            }
+        };
+        // Enter adds the top match; ↓ moves into the list.
+        search.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter && results.Items.Count > 0 && results.Items[0] is ListBoxItem { Tag: WeatherPlace first }) Add(first);
+            else if (e.Key == Key.Down && results.Items.Count > 0) { results.SelectedIndex = 0; (results.Items[0] as ListBoxItem)?.Focus(); }
+        };
+
         return Page(
-            Note("Open-Meteo, no key needed. Leave the city empty to use Windows location."),
-            Field("City", () => w.City, v => { w.City = v; w.Latitude = null; w.Longitude = null; }, after: () => _ = Notch.Weather.RefreshAsync()),
-            Toggle("Fahrenheit", () => w.Fahrenheit, v => w.Fahrenheit = v, () => _ = Notch.Weather.RefreshAsync()),
+            Note("Weather comes from Open-Meteo — free, no account. What you type in the search below is sent to Open-Meteo to find matching cities."),
+            Header("Your places", "The first one is your main weather (the Weather and Clock cards). All of them show on the World clocks card."),
+            list,
+            Header("Add a place"),
+            search,
+            results,
+            status,
+            Header("Units & updates"),
+            Toggle("Fahrenheit", () => w.Fahrenheit, v => w.Fahrenheit = v, RefreshAll),
             Slide("Refresh every (min)", 5, 120, () => w.RefreshMinutes, v => w.RefreshMinutes = (int)v),
-            Buttons(Chip("Refresh now", (_, _) => _ = Notch.Weather.RefreshAsync(), Glyphs.Refresh)));
+            Buttons(
+                Chip("Refresh now", (_, _) => RefreshAll(), Glyphs.Refresh),
+                Chip("Add World clocks card to Home", (_, _) => LayoutEditor.Add("world"), Glyphs.Home)));
     }
 
     // ---------------- Calendar ----------------

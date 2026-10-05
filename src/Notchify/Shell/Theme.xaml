@@ -30,6 +30,10 @@
     <SolidColorBrush x:Key="PopupBrush" Color="#F71B1B1F" />
     <SolidColorBrush x:Key="PopupStrokeBrush" Color="#24FFFFFF" />
 
+    <!-- Selected tab / sidebar row. Replaced at runtime from Appearance › Tab highlight. -->
+    <SolidColorBrush x:Key="TabTintFillBrush" Color="#290A84FF" />
+    <SolidColorBrush x:Key="TabTintTextBrush" Color="#FF0A84FF" />
+
     <!-- Motion: one feel everywhere. -->
     <Duration x:Key="FastDuration">0:0:0.14</Duration>
     <Duration x:Key="SlowDuration">0:0:0.22</Duration>
@@ -339,7 +343,7 @@
                     <Grid Background="Transparent">
                         <Border x:Name="Veil" Background="{DynamicResource HoverVeilBrush}" CornerRadius="11" Opacity="0" />
                         <Grid x:Name="Sel" Opacity="0">
-                            <Border Background="{DynamicResource AccentBrush}" Opacity="0.16" CornerRadius="11" />
+                            <Border Background="{DynamicResource TabTintFillBrush}" CornerRadius="11" />
                             <Border BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1" CornerRadius="11" />
                         </Grid>
                         <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -359,7 +363,7 @@
                             </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TabTintTextBrush}" />
                             <Trigger.EnterActions>
                                 <BeginStoryboard>
                                     <Storyboard><DoubleAnimation Storyboard.TargetName="Sel" Storyboard.TargetProperty="Opacity" To="1" Duration="{StaticResource SlowDuration}" EasingFunction="{StaticResource EaseOut}" /></Storyboard>
@@ -662,7 +666,7 @@
                     <Grid>
                         <Border x:Name="Veil" Background="{DynamicResource HoverVeilBrush}" CornerRadius="9" Opacity="0" />
                         <Grid x:Name="Sel" Opacity="0">
-                            <Border Background="{DynamicResource AccentBrush}" Opacity="0.16" CornerRadius="9" />
+                            <Border Background="{DynamicResource TabTintFillBrush}" CornerRadius="9" />
                             <Border BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1" CornerRadius="9" />
                         </Grid>
                         <ContentPresenter Margin="10,7" />
@@ -683,7 +687,7 @@
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Sel" Property="Opacity" Value="1" />
-                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TabTintTextBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

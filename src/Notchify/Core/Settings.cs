@@ -127,6 +127,10 @@ public sealed class AppearanceSettings
     public string TabLabels { get; set; } = "Always";
     /// <summary>Tabs that don't fit beside the clock: "Wrap" onto more rows (the notch grows to make room) or "Menu" (More ▾).</summary>
     public string TabOverflow { get; set; } = "Wrap";
+    /// <summary>Colour of the selected tab's capsule (also the Settings sidebar). Empty = the accent colour.</summary>
+    public string TabTintColor { get; set; } = "";
+    /// <summary>How strongly the selected tab is tinted, 0.05 (a whisper) to 1 (solid).</summary>
+    public double TabTintStrength { get; set; } = 0.16;
     /// <summary>-1 = primary display, otherwise index into the screen list.</summary>
     public int DisplayIndex { get; set; } = -1;
     public bool AnimationsEnabled { get; set; } = true;
@@ -207,11 +211,34 @@ public sealed class MediaSettings
 
 public sealed class WeatherSettings
 {
+    /// <summary>Older single-city setting; moved into <see cref="Places"/> on first run.</summary>
     public string City { get; set; } = "";
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
+    /// <summary>Your places, in order. The first one is your main weather; all of them show on the World clocks card.</summary>
+    public List<WeatherPlace> Places { get; set; } = new();
     public bool Fahrenheit { get; set; } = false;
     public int RefreshMinutes { get; set; } = 30;
+}
+
+/// <summary>A city picked from search, with its exact location and time zone.</summary>
+public sealed class WeatherPlace
+{
+    public string Name { get; set; } = "";
+    /// <summary>State / province, e.g. "Alberta".</summary>
+    public string Region { get; set; } = "";
+    public string Country { get; set; } = "";
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+    /// <summary>IANA time zone, e.g. "America/Edmonton". Empty until the first weather fetch fills it in.</summary>
+    public string TimeZone { get; set; } = "";
+
+    /// <summary>"Calgary, Alberta, Canada".</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string FullName => string.Join(", ", new[] { Name, Region, Country }.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct());
+    /// <summary>"Alberta, Canada".</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string Subtitle => string.Join(", ", new[] { Region, Country }.Where(x => !string.IsNullOrWhiteSpace(x) && x != Name).Distinct());
 }
 
 public sealed class SearchEngine

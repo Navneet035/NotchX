@@ -161,7 +161,112 @@ public sealed class WeatherService : ObservableObject
     {
         _timer.Interval = TimeSpan.FromMinutes(Math.Max(5, SettingsStore.Current.Weather.RefreshMinutes));
         _timer.Start();
-        _ = RefreshAsync();
+        _ = MigrateCityAsync();
+    }
+
+    /// <summary>Older settings had one free-text city; turn it into the first place, with exact coordinates.</summary>
+    private async Task MigrateCityAsync()
+    {
+        var s = SettingsStore.Current.Weather;
+        if (s.Places.Count == 0 && !string.IsNullOrWhiteSpace(s.City))
+        {
+            try
+            {
+                var match = (await SearchPlacesAsync(s.City)).FirstOrDefault();
+                if (match != null)
+                {
+                    // Keep the coordinates the user already had, if any; the search only fills in the rest.
+                    if (s.Latitude is { } lat && s.Longitude is { } lon) { match.Latitude = lat; match.Longitude = lon; }
+                    s.Places.Add(match);
+                    SettingsStore.Save();
+                }
+            }
+            catch (Exception ex) { Log.Info("weather migrate: " + ex.Message); }
+        }
+        await RefreshAsync();
+    }
+
+    /// <summary>Cities matching what's been typed so far ("Cal" → Calgary, Cali, California City…), from Open-Meteo's geocoder.</summary>
+    public static async Task<List<WeatherPlace>> SearchPlacesAsync(string query, CancellationToken cancel = default)
+    {
+        var list = new List<WeatherPlace>();
+        if (query.Trim().Length < 2) return list;
+        var json = await Http.Client.GetStringAsync(
+            $"https://geocoding-api.open-meteo.com/v1/search?count=8&language=en&format=json&name={Uri.EscapeDataString(query.Trim())}", cancel);
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("results", out var results)) return list;
+        foreach (var r in results.EnumerateArray())
+        {
+            string Str(string name) => r.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
+            list.Add(new WeatherPlace
+            {
+                Name = Str("name"),
+                Region = Str("admin1"),
+                Country = Str("country"),
+                Latitude = r.GetProperty("latitude").GetDouble(),
+                Longitude = r.GetProperty("longitude").GetDouble(),
+                TimeZone = Str("timezone"),
+            });
+        }
+        return list;
+    }
+
+    // ---------------- World clocks: every place's weather in one request ----------------
+
+    /// <summary>Latest conditions per place (same order as Settings › Weather › Places).</summary>
+    public IReadOnlyList<PlaceWeather> World { get; private set; } = Array.Empty<PlaceWeather>();
+    public event Action? WorldUpdated;
+    private DateTime _worldFetched = DateTime.MinValue;
+    private string _worldKey = "";
+
+    /// <summary>Fetch weather for all places, unless it's fresh enough (or <paramref name="force"/>).</summary>
+    public async Task RefreshWorldAsync(bool force = false)
+    {
+        var s = SettingsStore.Current.Weather;
+        var places = s.Places.ToList();
+        var key = string.Join("|", places.Select(p => FormattableString.Invariant($"{p.Latitude},{p.Longitude}"))) + s.Fahrenheit;
+        if (!force && key == _worldKey && DateTime.Now - _worldFetched < TimeSpan.FromMinutes(Math.Max(5, s.RefreshMinutes))) return;
+        if (places.Count == 0)
+        {
+            World = Array.Empty<PlaceWeather>();
+            _worldKey = key;
+            WorldUpdated?.Invoke();
+            return;
+        }
+        try
+        {
+            var lats = string.Join(",", places.Select(p => p.Latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            var lons = string.Join(",", places.Select(p => p.Longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            var unit = s.Fahrenheit ? "&temperature_unit=fahrenheit" : "";
+            var json = await Http.Client.GetStringAsync(
+                $"https://api.open-meteo.com/v1/forecast?latitude={lats}&longitude={lons}&current=temperature_2m,weather_code,is_day&timezone=auto&forecast_days=1{unit}");
+            using var doc = JsonDocument.Parse(json);
+            // One place comes back as an object, several as an array.
+            var items = doc.RootElement.ValueKind == JsonValueKind.Array ? doc.RootElement.EnumerateArray().ToList() : new List<JsonElement> { doc.RootElement };
+            var result = new List<PlaceWeather>();
+            var filledZone = false;
+            for (var i = 0; i < places.Count && i < items.Count; i++)
+            {
+                var it = items[i];
+                var cur = it.GetProperty("current");
+                var code = cur.GetProperty("weather_code").GetInt32();
+                var isDay = cur.GetProperty("is_day").GetInt32() == 1;
+                var (icon, condition) = Describe(code, isDay);
+                var offset = it.TryGetProperty("utc_offset_seconds", out var o) ? o.GetInt32() : 0;
+                if (string.IsNullOrEmpty(places[i].TimeZone) && it.TryGetProperty("timezone", out var tz) && tz.GetString() is { Length: > 0 } zone)
+                {
+                    places[i].TimeZone = zone;
+                    filledZone = true;
+                }
+                result.Add(new PlaceWeather(places[i], $"{Math.Round(cur.GetProperty("temperature_2m").GetDouble())}°", icon, condition, isDay, offset));
+            }
+            if (filledZone) SettingsStore.Save();
+            World = result;
+            _worldKey = key;
+            _worldFetched = DateTime.Now;
+            WorldUpdated?.Invoke();
+        }
+        catch (Exception ex) { Log.Info("world weather: " + ex.Message); }
     }
 
     public async Task RefreshAsync()
@@ -171,11 +276,18 @@ public sealed class WeatherService : ObservableObject
             var s = SettingsStore.Current.Weather;
             double? lat = s.Latitude, lon = s.Longitude;
             var place = s.City;
+            // The first place in the list is the main weather.
+            if (s.Places.FirstOrDefault() is { } main)
+            {
+                lat = main.Latitude;
+                lon = main.Longitude;
+                place = main.Name;
+            }
 
-            if (!string.IsNullOrWhiteSpace(s.City) && (lat == null || lon == null))
+            if (!string.IsNullOrWhiteSpace(place) && (lat == null || lon == null))
             {
                 var geo = await Http.Client.GetStringAsync(
-                    $"https://geocoding-api.open-meteo.com/v1/search?count=1&name={Uri.EscapeDataString(s.City)}");
+                    $"https://geocoding-api.open-meteo.com/v1/search?count=1&name={Uri.EscapeDataString(place)}");
                 using var gd = JsonDocument.Parse(geo);
                 if (gd.RootElement.TryGetProperty("results", out var r) && r.GetArrayLength() > 0)
                 {
@@ -244,6 +356,47 @@ public sealed class WeatherService : ObservableObject
         >= 95 => ("⛈", "Thunderstorm"),
         _ => ("☁", "—"),
     };
+}
+
+/// <summary>Current conditions at one of the user's places, and how to tell its local time.</summary>
+public sealed record PlaceWeather(WeatherPlace Place, string Temperature, string Icon, string Condition, bool IsDay, int UtcOffsetSeconds)
+{
+    /// <summary>Local time there: by its time zone (follows daylight saving), else the offset the forecast reported.</summary>
+    public DateTimeOffset Now => PlaceTime.Now(Place, UtcOffsetSeconds);
+}
+
+public static class PlaceTime
+{
+    private static readonly Dictionary<string, TimeZoneInfo?> Zones = new();
+
+    public static DateTimeOffset Now(WeatherPlace place, int fallbackOffsetSeconds = 0)
+    {
+        var now = DateTimeOffset.Now;
+        if (Zone(place.TimeZone) is { } tz) return TimeZoneInfo.ConvertTime(now, tz);
+        return now.ToOffset(TimeSpan.FromSeconds(fallbackOffsetSeconds));
+    }
+
+    private static TimeZoneInfo? Zone(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return null;
+        if (Zones.TryGetValue(id, out var z)) return z;
+        // .NET understands IANA ids ("Asia/Kolkata") on Windows through ICU.
+        try { z = TimeZoneInfo.FindSystemTimeZoneById(id); } catch { z = null; }
+        return Zones[id] = z;
+    }
+
+    /// <summary>"Same time", "+11h 30m · tomorrow", "−7h · yesterday".</summary>
+    public static string Difference(DateTimeOffset there)
+    {
+        var here = DateTimeOffset.Now;
+        var diff = there.Offset - here.Offset;
+        var day = (there.Date - here.Date).Days switch { 1 => " · tomorrow", -1 => " · yesterday", _ => "" };
+        if (diff == TimeSpan.Zero) return "Same time" + day;
+        var sign = diff > TimeSpan.Zero ? "+" : "−";
+        var abs = diff.Duration();
+        var text = abs.Minutes == 0 ? $"{sign}{(int)abs.TotalHours}h" : $"{sign}{(int)abs.TotalHours}h {abs.Minutes}m";
+        return text + day;
+    }
 }
 
 /// <summary>Remembers the last foreground app that wasn't Notchify, and reports fullscreen apps.</summary>

@@ -60,6 +60,7 @@ public interface INotchShell
     /// <summary>The app that had focus before the user interacted with the notch (target for paste).</summary>
     IntPtr LastExternalWindow { get; }
     void PopOut(string moduleId);
-    void ShowSettings();
+    /// <summary>Open Settings, optionally on a page ("Weather", "Home"…).</summary>
+    void ShowSettings(string? page = null);
     void ApplySettings();
 }

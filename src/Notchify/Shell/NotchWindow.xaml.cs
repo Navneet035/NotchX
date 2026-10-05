@@ -193,6 +193,7 @@ public partial class NotchWindow : Window, INotchShell
         var a = s.Appearance;
         Application.Current.Resources["AccentBrush"] = Ui.Brush(a.AccentColor);
         Application.Current.Resources["NotchBrush"] = Ui.Brush(a.BackgroundColor);
+        ApplyTabTint(a);
         Sheen.Opacity = Math.Clamp(a.GlassIntensity, 0, 1);
         Rim.Opacity = Math.Clamp(a.GlassIntensity, 0, 1);
         PillHost.Margin = new Thickness(0, a.TopOffset, 0, 0);
@@ -232,6 +233,29 @@ public partial class NotchWindow : Window, INotchShell
     }
 
     private string? _tabLabels;
+
+    /// <summary>
+    /// The selected tab's capsule colour and strength. A strong tint would hide text of the same colour,
+    /// so past halfway the name switches to white or black, whichever reads better on it.
+    /// </summary>
+    private static void ApplyTabTint(AppearanceSettings a)
+    {
+        var tint = Ui.Color(string.IsNullOrWhiteSpace(a.TabTintColor) ? a.AccentColor : a.TabTintColor);
+        tint.A = 255;
+        var strength = Math.Clamp(a.TabTintStrength, 0.05, 1);
+        var fill = new SolidColorBrush(Color.FromArgb((byte)Math.Round(strength * 255), tint.R, tint.G, tint.B));
+        fill.Freeze();
+        Color text = tint;
+        if (strength >= 0.5)
+        {
+            var luminance = (0.299 * tint.R + 0.587 * tint.G + 0.114 * tint.B) / 255;
+            text = luminance > 0.6 ? Colors.Black : Colors.White;
+        }
+        var textBrush = new SolidColorBrush(text);
+        textBrush.Freeze();
+        Application.Current.Resources["TabTintFillBrush"] = fill;
+        Application.Current.Resources["TabTintTextBrush"] = textBrush;
+    }
 
     private static Brush BuildPanelBrush(AppearanceSettings a, bool glass)
     {
@@ -1076,12 +1100,15 @@ public partial class NotchWindow : Window, INotchShell
 
     private SettingsWindow? _settings;
 
-    public void ShowSettings()
+    public void ShowSettings(string? page = null)
     {
         Collapse();
-        if (_settings is { IsLoaded: true }) { _settings.Activate(); return; }
-        _settings = new SettingsWindow();
-        _settings.Show();
+        if (_settings is not { IsLoaded: true })
+        {
+            _settings = new SettingsWindow();
+            _settings.Show();
+        }
+        if (page != null) _settings.Navigate(page);
         _settings.Activate();
     }
 }
