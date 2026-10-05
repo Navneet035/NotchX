@@ -271,6 +271,50 @@ public sealed class MediaService : ObservableObject
         await _session.TryChangePlaybackRateAsync(rate);
     }
 
+    /// <summary>
+    /// Bring the app that's playing to the front. For a browser with several windows, prefer the one whose title
+    /// mentions the track (the playing tab is usually titled after it). Store apps without an open window are launched.
+    /// </summary>
+    public void ShowSourceApp()
+    {
+        var id = SourceAppId;
+        if (string.IsNullOrEmpty(id)) return;
+        var process = FriendlyAppName(id) switch
+        {
+            "Chrome" => "chrome",
+            "Edge" => "msedge",
+            "Brave" => "brave",
+            "Firefox" => "firefox",
+            "Vivaldi" => "vivaldi",
+            "Opera" => "opera",
+            "Spotify" => "Spotify",
+            _ => Path.GetFileNameWithoutExtension(id.Split('!')[0]),
+        };
+        var pids = System.Diagnostics.Process.GetProcessesByName(process).Select(p => (uint)p.Id).ToHashSet();
+        var title = Title;
+        IntPtr best = IntPtr.Zero, any = IntPtr.Zero;
+        Native.EnumWindows((h, _) =>
+        {
+            if (!Native.IsWindowVisible(h) || Native.GetWindow(h, Native.GW_OWNER) != IntPtr.Zero) return true;
+            Native.GetWindowThreadProcessId(h, out var pid);
+            if (!pids.Contains(pid)) return true;
+            var text = Native.GetWindowTitle(h);
+            if (string.IsNullOrWhiteSpace(text)) return true;
+            if (any == IntPtr.Zero) any = h;
+            if (!string.IsNullOrEmpty(title) && text.Contains(title, StringComparison.OrdinalIgnoreCase)) { best = h; return false; }
+            return true;
+        }, IntPtr.Zero);
+
+        var target = best != IntPtr.Zero ? best : any;
+        if (target != IntPtr.Zero) { WindowListService.Activate(target); return; }
+        // Store apps (Media Player, Apple Music…) open by their app id, which also brings back a closed window.
+        if (id.Contains('!'))
+        {
+            Notch.Shell.Collapse();
+            Ui.OpenUrl($"shell:AppsFolder\\{id}");
+        }
+    }
+
     public static string FriendlyAppName(string id)
     {
         var l = id.ToLowerInvariant();

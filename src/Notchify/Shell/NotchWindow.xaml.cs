@@ -59,6 +59,7 @@ public partial class NotchWindow : Window, INotchShell
         Pill.ContextMenuOpening += Pill_ContextMenuOpening;
         LayoutEditor.Changed += OnLayoutEditChanged;
         Header.MouseWheel += Header_MouseWheel;
+        Header.SizeChanged += Header_SizeChanged;
         PreviewKeyDown += OnPreviewKeyDown;
         Deactivated += (_, _) => { if (_state == NotchState.Expanded && !_dragging && !CursorOverPill() && PinToggle.IsChecked != true) Collapse(); };
         // Any drag that starts inside the notch (windows between desktops, shelf files, launcher tiles, Home cards…)
@@ -159,7 +160,8 @@ public partial class NotchWindow : Window, INotchShell
             var scale = GetDpiForMonitor(hmon, 0, out var dpi, out _) == 0 ? dpi / 96.0 : 1.0;
 
             var wDip = Math.Max(a.ExpandedWidth, 460) + 60;
-            var hDip = Math.Max(a.ExpandedHeight, 180) + a.TopOffset + 40;
+            // + room for up to three extra rows of wrapped tabs (empty window pixels are click-through).
+            var hDip = Math.Max(a.ExpandedHeight, 180) + a.TopOffset + 40 + 140;
             var wPx = (int)(wDip * scale);
             var hPx = (int)(hDip * scale);
             Native.SetWindowPos(_hwnd, Native.HWND_TOPMOST, b.Left + (b.Width - wPx) / 2, b.Top, wPx, hPx, Native.SWP_NOACTIVATE);
@@ -216,10 +218,11 @@ public partial class NotchWindow : Window, INotchShell
             Native.SetWindowDisplayAffinity(_hwnd, affinity);
             _glass.SetExcludedFromCapture(s.Behavior.HideFromScreenCapture);
         }
-        if (a.TabLabels != _tabLabels)
+        var tabLook = a.TabLabels + "|" + a.TabOverflow;
+        if (tabLook != _tabLabels)
         {
             var first = _tabLabels == null;
-            _tabLabels = a.TabLabels;
+            _tabLabels = tabLook;
             if (!first) RebuildTabs();
         }
         UpdateHeader(); // clock format may have changed
@@ -388,7 +391,7 @@ public partial class NotchWindow : Window, INotchShell
         {
             case NotchState.Expanded:
                 w = a.ExpandedWidth;
-                h = a.ExpandedHeight;
+                h = a.ExpandedHeight + _headerExtra;
                 break;
             case NotchState.Island:
                 w = Math.Max(a.CollapsedWidth + 120, 380) * (IslandLayer.Content is Island { Progress: not null } ? SettingsStore.Current.Huds.HudScale : 1);
@@ -643,13 +646,7 @@ public partial class NotchWindow : Window, INotchShell
 
     private void Header_MouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (LayoutEditor.IsEditing)
-        {
-            // The editable tab chips are wider than the header; the wheel scrolls them sideways.
-            TabScroller.ScrollToHorizontalOffset(TabScroller.HorizontalOffset - e.Delta / 2.0);
-            e.Handled = true;
-            return;
-        }
+        if (LayoutEditor.IsEditing) return; // every chip is on screen (they wrap); nothing to scroll
         if (!SettingsStore.Current.Behavior.ScrollToSwitchTabs) return;
         SwitchTab(e.Delta < 0 ? 1 : -1);
         e.Handled = true;
@@ -702,12 +699,17 @@ public partial class NotchWindow : Window, INotchShell
         _tabButtons.Clear();
         _moreButton = null;
         _overflow.Clear();
-        if (LayoutEditor.IsEditing) { BuildEditableTabs(); return; }
-        TabScroller.ScrollToHorizontalOffset(0);
-        var index = 1;
-        var labels = SettingsStore.Current.Appearance.TabLabels;
+        var appearance = SettingsStore.Current.Appearance;
+        var labels = appearance.TabLabels;
         var withLabels = labels != "Never";
-        Header.Height = withLabels ? 44 : 32;
+        _rowHeight = withLabels ? 44 : 32;
+        HeaderRight.Height = _rowHeight;
+        Header.MinHeight = _rowHeight;
+        // One fixed row with "More ▾", or as many rows as the tabs need (always while editing, so every tab can be arranged).
+        var wrap = LayoutEditor.IsEditing || appearance.TabOverflow != "Menu";
+        Header.Height = wrap ? double.NaN : _rowHeight;
+        if (LayoutEditor.IsEditing) { BuildEditableTabs(); return; }
+        var index = 1;
         foreach (var m in Notch.Modules.Tabs)
         {
             var id = m.Id;
@@ -777,11 +779,32 @@ public partial class NotchWindow : Window, INotchShell
         if (e.WidthChanged) LayoutTabs();
     }
 
-    /// <summary>Show as many tabs as fit beside the clock; the rest move into the "More" menu.</summary>
+    private double _rowHeight = 44;
+    private double _headerExtra;
+
+    /// <summary>When the tabs wrap onto more rows, grow the open notch by that much so the page keeps its space.</summary>
+    private void Header_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (!e.HeightChanged) return;
+        var extra = Math.Max(0, Header.ActualHeight - _rowHeight);
+        if (Math.Abs(extra - _headerExtra) < 0.5) return;
+        _headerExtra = extra;
+        if (_state == NotchState.Expanded) RefreshSize(animate: true);
+    }
+
+    /// <summary>Show as many tabs as fit beside the clock; the rest move into the "More" menu (or wrap, if that's the setting).</summary>
     private void LayoutTabs()
     {
         if (LayoutEditor.IsEditing || _moreButton == null || _tabButtons.Count == 0) return;
-        var available = TabScroller.ActualWidth;
+        if (SettingsStore.Current.Appearance.TabOverflow != "Menu")
+        {
+            foreach (var (rb, _) in _tabButtons) rb.Visibility = Visibility.Visible;
+            _overflow.Clear();
+            _moreButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+        // A couple of pixels' slack so rounding never pushes the last tab onto a second row.
+        var available = TabScroller.ActualWidth - 2;
         if (available <= 0) return;
 
         var infinite = new Size(double.PositiveInfinity, double.PositiveInfinity);
@@ -858,7 +881,7 @@ public partial class NotchWindow : Window, INotchShell
             {
                 CornerRadius = new CornerRadius(9),
                 Padding = new Thickness(6, 1, 1, 1),
-                Margin = new Thickness(0, 0, 3, 0),
+                Margin = new Thickness(0, 3, 4, 3),
                 Background = (Brush)FindResource(id == _tab ? "CardHoverBrush" : "CardBrush"),
                 BorderBrush = (Brush)FindResource("DividerBrush"),
                 BorderThickness = new Thickness(1),
@@ -869,7 +892,13 @@ public partial class NotchWindow : Window, INotchShell
                 Child = new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
-                    Children = { new TextBlock { Text = m.Glyph, Style = (Style)FindResource("Icon"), Margin = new Thickness(0, 0, 4, 0) }, eye },
+                    Children =
+                    {
+                        new TextBlock { Text = m.Glyph, Style = (Style)FindResource("Icon"), Margin = new Thickness(0, 0, 5, 0) },
+                        new TextBlock { Text = m.ShortTitle, Style = (Style)FindResource("Caption"), Foreground = (Brush)FindResource("TextBrush"),
+                            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 2, 0) },
+                        eye,
+                    },
                 },
             };
             Point? pressed = null;
@@ -939,7 +968,19 @@ public partial class NotchWindow : Window, INotchShell
         Option("Smart (music while playing)", "smart");
         menu.Items.Add(openOn);
 
-        var edit = new MenuItem { Header = LayoutEditor.IsEditing ? "Finish editing layout" : "Edit layout…" };
+        var a = SettingsStore.Current.Appearance;
+        var extra = new MenuItem { Header = "Tabs that don't fit" };
+        void Overflow(string label, string value)
+        {
+            var item = new MenuItem { Header = label, IsCheckable = true, IsChecked = a.TabOverflow == value };
+            item.Click += (_, _) => { a.TabOverflow = value; SettingsStore.NotifyChanged(); };
+            extra.Items.Add(item);
+        }
+        Overflow("Show on a second row", "Wrap");
+        Overflow("Put in a More ▾ menu", "Menu");
+        menu.Items.Add(extra);
+
+        var edit =new MenuItem { Header = LayoutEditor.IsEditing ? "Finish editing layout" : "Edit layout…" };
         edit.Click += (_, _) =>
         {
             if (!LayoutEditor.IsEditing && _state != NotchState.Expanded) { Expand(); Activate(); }

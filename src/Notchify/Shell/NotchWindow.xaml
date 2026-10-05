@@ -146,7 +146,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel x:Name="HeaderRight" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                            <StackPanel x:Name="HeaderRight" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Height="32" Margin="10,0,0,0">
                                 <Button x:Name="AddCardButton" Style="{StaticResource ChipButton}" Content="+ Add card" Visibility="Collapsed"
                                         Margin="0,0,6,0" Click="AddCard_Click" ToolTip="Add a card to Home" />
                                 <Button x:Name="DoneButton" Style="{StaticResource AccentButton}" Content="Done" Visibility="Collapsed"
@@ -163,9 +163,10 @@
                                 <Button Style="{StaticResource IconButton}" Content="&#xE8A7;" ToolTip="Pop out this tab" Click="PopOut_Click" />
                                 <Button Style="{StaticResource IconButton}" Content="&#xE713;" ToolTip="Settings" Click="Settings_Click" />
                             </StackPanel>
-                            <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" x:Name="TabScroller"
+                            <!-- Tabs wrap onto more rows (Wrap setting, and always while editing the layout). -->
+                            <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled" x:Name="TabScroller"
                                           SizeChanged="TabScroller_SizeChanged">
-                                <StackPanel x:Name="TabStrip" Orientation="Horizontal" VerticalAlignment="Center" />
+                                <WrapPanel x:Name="TabStrip" Orientation="Horizontal" VerticalAlignment="Top" />
                             </ScrollViewer>
                         </Grid>
 

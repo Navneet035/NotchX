@@ -69,7 +69,8 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <Border Width="52" Height="52" CornerRadius="10" Background="{Binding Media.ArtBrush}">
+                            <Border Width="52" Height="52" CornerRadius="10" Background="{Binding Media.ArtBrush}" Cursor="Hand"
+                                    MouseLeftButtonUp="Art_Click" ToolTip="{Binding Media.SourceName}">
                                 <Border CornerRadius="10">
                                     <Border.Background>
                                         <ImageBrush ImageSource="{Binding Media.Art}" Stretch="UniformToFill" />

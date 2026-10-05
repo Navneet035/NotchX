@@ -146,6 +146,13 @@ public partial class NowPlayingView : UserControl
         Notch.Media.SetRate(double.Parse((string)item.Tag, System.Globalization.CultureInfo.InvariantCulture));
     }
 
+    /// <summary>Clicking the album art opens the app that's playing.</summary>
+    private void Art_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        Notch.Media.ShowSourceApp();
+    }
+
     private void Prev_Click(object sender, RoutedEventArgs e) => Notch.Media.Previous();
     private void Play_Click(object sender, RoutedEventArgs e) => Notch.Media.PlayPause();
     private void Next_Click(object sender, RoutedEventArgs e) => Notch.Media.Next();

@@ -162,11 +162,14 @@ public sealed class WindowListService
     // ---------------- actions ----------------
 
     /// <summary>Bring a window to the front. If it's on another desktop, Windows switches there.</summary>
-    public static void Activate(OpenWindow w)
+    public static void Activate(OpenWindow w) => Activate(w.Handle);
+
+    /// <summary>Bring a window to the front (restoring it if minimised) and close the notch.</summary>
+    public static void Activate(IntPtr handle)
     {
         Notch.Shell.Collapse();
-        if (Native.IsIconic(w.Handle)) Native.ShowWindow(w.Handle, Native.SW_RESTORE);
-        if (!Native.SetForegroundWindow(w.Handle)) Native.SwitchToThisWindow(w.Handle, true);
+        if (Native.IsIconic(handle)) Native.ShowWindow(handle, Native.SW_RESTORE);
+        if (!Native.SetForegroundWindow(handle)) Native.SwitchToThisWindow(handle, true);
     }
 
     public void Close(OpenWindow w)

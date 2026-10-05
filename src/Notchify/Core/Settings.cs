@@ -125,6 +125,8 @@ public sealed class AppearanceSettings
     public double UiScale { get; set; } = 1.0;
     /// <summary>Text under the tab icons: "Always", "Selected" (only the open tab) or "Never".</summary>
     public string TabLabels { get; set; } = "Always";
+    /// <summary>Tabs that don't fit beside the clock: "Wrap" onto more rows (the notch grows to make room) or "Menu" (More ▾).</summary>
+    public string TabOverflow { get; set; } = "Wrap";
     /// <summary>-1 = primary display, otherwise index into the screen list.</summary>
     public int DisplayIndex { get; set; } = -1;
     public bool AnimationsEnabled { get; set; } = true;

@@ -337,6 +337,13 @@ public partial class HomeView : UserControl
         return cell;
     }
 
+    /// <summary>Clicking the album art opens the app that's playing.</summary>
+    private void Art_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        Notch.Media.ShowSourceApp();
+    }
+
     // ---------------- Live bits ----------------
 
     private void Tick()

@@ -15,7 +15,8 @@
             </Grid.ColumnDefinitions>
 
             <!-- Album art with a soft glow in its own colour -->
-            <Grid Width="150" Height="150" VerticalAlignment="Center">
+            <Grid Width="150" Height="150" VerticalAlignment="Center" Cursor="Hand" Background="Transparent"
+                  MouseLeftButtonUp="Art_Click" ToolTip="{Binding Media.SourceName}" ToolTipService.InitialShowDelay="400">
                 <Border CornerRadius="16" Background="{Binding Media.ArtBrush}" Opacity="0.6" Margin="6">
                     <Border.Effect>
                         <BlurEffect Radius="26" />
