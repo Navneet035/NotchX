@@ -1172,6 +1172,11 @@ public partial class NotchWindow : Window, INotchShell
             await Task.Delay(1500);
             if (_settings?.Content is FrameworkElement content)
                 SaveShot(System.IO.Path.Combine(folder, "settings.png"), content, (Brush)FindResource("PanelBrush"), pad: 0);
+            // The Home page of Settings, with its live layout preview.
+            _settings?.Navigate("Home");
+            await Task.Delay(1200);
+            if (_settings?.Content is FrameworkElement home)
+                SaveShot(System.IO.Path.Combine(folder, "settings-home.png"), home, (Brush)FindResource("PanelBrush"), pad: 0);
             _settings?.Close();
             Log.Info("README screenshots saved to " + folder);
         }
