@@ -191,6 +191,21 @@ public sealed class WindowListService
         Refresh();
     }
 
+    /// <summary>Whether windows can be sent to any desktop (drag between desktops, "Move to ▸").</summary>
+    public static bool CanMoveBetweenDesktops => DesktopMover.CanTargetAnyDesktop;
+
+    /// <summary>Send windows to another desktop without switching there.</summary>
+    public void MoveTo(IReadOnlyCollection<OpenWindow> windows, DesktopWindows target)
+    {
+        var failed = windows.Count(w => w.DesktopId != target.Id && !(target.IsCurrent
+            ? DesktopMover.MoveToCurrent(w.Handle)
+            : DesktopMover.MoveToDesktop(w.Handle, target.Id)));
+        if (failed > 0)
+            Notch.Hub.Notify(Glyphs.Warning, failed == 1 ? "Couldn't move a window" : $"Couldn't move {failed} windows",
+                "Some apps (like ones running as administrator) can't be moved by other apps.", Ui.Orange);
+        Refresh();
+    }
+
     [ComImport, Guid("a5cd92ff-29be-454c-8d04-d82879fb3f1b"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IVirtualDesktopManager
     {
@@ -218,6 +233,7 @@ internal static unsafe class DesktopMover
 
     private static IntPtr _manager, _views;
     private static bool? _ok;
+    private static bool _isLatest;
 
     public static bool Available => Init();
 
@@ -232,7 +248,12 @@ internal static unsafe class DesktopMover
             {
                 var sid = ManagerService;
                 var id = iid;
-                if (shell.QueryService(ref sid, ref id, out var p) == 0 && p != IntPtr.Zero) { _manager = p; break; }
+                if (shell.QueryService(ref sid, ref id, out var p) == 0 && p != IntPtr.Zero)
+                {
+                    _manager = p;
+                    _isLatest = iid == ManagerIids[0];
+                    break;
+                }
             }
             var vs = ViewCollection;
             var vi = ViewCollection;
@@ -243,7 +264,32 @@ internal static unsafe class DesktopMover
         return _ok.Value;
     }
 
-    public static bool MoveToCurrent(IntPtr hwnd)
+    /// <summary>
+    /// Whether windows can be sent to any desktop, not just the current one. Needs FindDesktop, whose slot we've
+    /// only confirmed on 24H2+ (it returns the same desktop as GetCurrentDesktop for the current id), so older
+    /// builds get "move here" only.
+    /// </summary>
+    public static bool CanTargetAnyDesktop => Init() && _isLatest;
+
+    public static bool MoveToCurrent(IntPtr hwnd) => Move(hwnd, (manager, vt, desktop) =>
+        // IVirtualDesktopManagerInternal: 3 GetCount, 4 MoveViewToDesktop, 5 CanViewMoveDesktops, 6 GetCurrentDesktop
+        ((delegate* unmanaged[Stdcall]<IntPtr, IntPtr*, int>)vt[6])(manager, desktop));
+
+    public static bool MoveToDesktop(IntPtr hwnd, Guid target)
+    {
+        if (!CanTargetAnyDesktop) return false;
+        return Move(hwnd, (manager, vt, desktop) =>
+        {
+            // … 7 GetDesktops, 8 GetAdjacentDesktop, 9 SwitchDesktop, 10 SwitchDesktopAndMoveView,
+            //   11 CreateDesktop, 12 MoveDesktop, 13 RemoveDesktop, 14 FindDesktop
+            var id = target;
+            return ((delegate* unmanaged[Stdcall]<IntPtr, Guid*, IntPtr*, int>)vt[14])(manager, &id, desktop);
+        });
+    }
+
+    private delegate int DesktopGetter(IntPtr manager, IntPtr* vtable, IntPtr* desktop);
+
+    private static bool Move(IntPtr hwnd, DesktopGetter getDesktop)
     {
         if (!Init()) return false;
         IntPtr view = IntPtr.Zero, desktop = IntPtr.Zero;
@@ -253,10 +299,8 @@ internal static unsafe class DesktopMover
             var views = *(IntPtr**)_views;
             var getViewForHwnd = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr, IntPtr*, int>)views[6];
             if (getViewForHwnd(_views, hwnd, &view) != 0 || view == IntPtr.Zero) return false;
-            // IVirtualDesktopManagerInternal: 3 GetCount, 4 MoveViewToDesktop, 5 CanViewMoveDesktops, 6 GetCurrentDesktop
             var manager = *(IntPtr**)_manager;
-            var getCurrent = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr*, int>)manager[6];
-            if (getCurrent(_manager, &desktop) != 0 || desktop == IntPtr.Zero) return false;
+            if (getDesktop(_manager, manager, &desktop) != 0 || desktop == IntPtr.Zero) return false;
             var move = (delegate* unmanaged[Stdcall]<IntPtr, IntPtr, IntPtr, int>)manager[4];
             return move(_manager, view, desktop) == 0;
         }
