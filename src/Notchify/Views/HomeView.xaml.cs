@@ -341,7 +341,7 @@ public partial class HomeView : UserControl
 
     private void Tick()
     {
-        Time.Text = DateTime.Now.ToString("t");
+        Time.Text = ClockFormat.Time(DateTime.Now);
         Date.Text = DateTime.Now.ToString("dddd, d MMMM");
         foreach (var t in _toggles)
             t.IsChecked = (string)t.Tag switch

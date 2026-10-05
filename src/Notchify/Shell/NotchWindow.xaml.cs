@@ -219,6 +219,7 @@ public partial class NotchWindow : Window, INotchShell
             _tabLabels = a.TabLabels;
             if (!first) RebuildTabs();
         }
+        UpdateHeader(); // clock format may have changed
         PositionWindow();
         RefreshSize(animate: false);
         UpdateFill();
@@ -650,10 +651,18 @@ public partial class NotchWindow : Window, INotchShell
 
     // ---------------- Tabs ----------------
 
+    private readonly List<(RadioButton Button, NotchModule Module)> _tabButtons = new();
+    private RadioButton? _moreButton;
+    private List<NotchModule> _overflow = new();
+
     private void RebuildTabs()
     {
         TabStrip.Children.Clear();
+        _tabButtons.Clear();
+        _moreButton = null;
+        _overflow.Clear();
         if (LayoutEditor.IsEditing) { BuildEditableTabs(); return; }
+        TabScroller.ScrollToHorizontalOffset(0);
         var index = 1;
         var labels = SettingsStore.Current.Appearance.TabLabels;
         var withLabels = labels != "Never";
@@ -664,46 +673,133 @@ public partial class NotchWindow : Window, INotchShell
             var rb = new RadioButton
             {
                 Style = (Style)FindResource("TabButton"),
-                Content = m.Glyph,
                 GroupName = "tabs",
                 Tag = id,
                 ToolTip = index <= 9 ? $"{m.Title}  (Ctrl+{index})" : m.Title,
                 IsChecked = id == _tab,
             };
-            if (withLabels)
-            {
-                // Icon with its name underneath, so you can tell the tabs apart without opening them.
-                var label = new TextBlock
-                {
-                    Text = m.ShortTitle,
-                    FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI"),
-                    FontSize = 9.5,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Margin = new Thickness(0, 1, 0, 0),
-                };
-                if (labels == "Selected")
-                    label.SetBinding(VisibilityProperty, new System.Windows.Data.Binding(nameof(RadioButton.IsChecked))
-                        { Source = rb, Converter = Notchify.Controls.Converters.Visible });
-                rb.Content = new StackPanel
-                {
-                    Children =
-                    {
-                        new TextBlock { Text = m.Glyph, FontSize = 14, HorizontalAlignment = HorizontalAlignment.Center },
-                        label,
-                    },
-                };
-                rb.Width = double.NaN;
-                rb.MinWidth = 40;
-                rb.Height = 40;
-                rb.Padding = new Thickness(6, 0, 6, 0);
-            }
+            SetTabContent(rb, m.Glyph, m.ShortTitle, labels, rb);
             rb.Checked += (_, _) => ShowTab(id);
             TabStrip.Children.Add(rb);
+            _tabButtons.Add((rb, m));
             index++;
         }
+
+        // Tabs that don't fit go into "More ▾" at the end of the row.
+        _moreButton = new RadioButton { Style = (Style)FindResource("TabButton"), Visibility = Visibility.Collapsed, ToolTip = "More tabs" };
+        _moreButton.PreviewMouseLeftButtonDown += (_, e) => { e.Handled = true; OpenMoreMenu(); };
+        TabStrip.Children.Add(_moreButton);
+
         if (Notch.Modules.Tabs.All(t => t.Id != _tab)) _tab = Notch.Modules.Tabs.FirstOrDefault()?.Id ?? "home";
         foreach (var stale in _views.Keys.Where(k => Notch.Modules.Tabs.All(t => t.Id != k)).ToList()) _views.Remove(stale);
         if (_state == NotchState.Expanded) ShowTab(_tab);
+        Dispatcher.BeginInvoke(LayoutTabs, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    /// <summary>Icon, with the name underneath unless labels are off ("Selected" = only while <paramref name="checkedSource"/> is on).</summary>
+    private static void SetTabContent(RadioButton rb, string glyph, string label, string labels, RadioButton checkedSource)
+    {
+        if (labels == "Never")
+        {
+            rb.Content = glyph;
+            return;
+        }
+        var text = new TextBlock
+        {
+            Text = label,
+            FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI"),
+            FontSize = 9.5,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxWidth = 64,
+            Margin = new Thickness(0, 1, 0, 0),
+        };
+        if (labels == "Selected")
+            text.SetBinding(VisibilityProperty, new System.Windows.Data.Binding(nameof(RadioButton.IsChecked))
+                { Source = checkedSource, Converter = Notchify.Controls.Converters.Visible });
+        rb.Content = new StackPanel
+        {
+            Children =
+            {
+                new TextBlock { Text = glyph, FontSize = 14, HorizontalAlignment = HorizontalAlignment.Center },
+                text,
+            },
+        };
+        rb.Width = double.NaN;
+        rb.MinWidth = 40;
+        rb.Height = 40;
+        rb.Padding = new Thickness(6, 0, 6, 0);
+    }
+
+    private void TabScroller_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (e.WidthChanged) LayoutTabs();
+    }
+
+    /// <summary>Show as many tabs as fit beside the clock; the rest move into the "More" menu.</summary>
+    private void LayoutTabs()
+    {
+        if (LayoutEditor.IsEditing || _moreButton == null || _tabButtons.Count == 0) return;
+        var available = TabScroller.ActualWidth;
+        if (available <= 0) return;
+
+        var infinite = new Size(double.PositiveInfinity, double.PositiveInfinity);
+        var widths = new List<double>();
+        foreach (var (rb, _) in _tabButtons)
+        {
+            rb.Visibility = Visibility.Visible;
+            rb.Measure(infinite);
+            widths.Add(rb.DesiredSize.Width + rb.Margin.Left + rb.Margin.Right);
+        }
+        var fit = _tabButtons.Count;
+        if (widths.Sum() > available)
+        {
+            // Leave room for the More button, sized for its widest look (it shows the open tab's name when that's hidden).
+            var room = available - MoreButtonWidth;
+            fit = 0;
+            var used = 0.0;
+            while (fit < _tabButtons.Count && used + widths[fit] <= room) used += widths[fit++];
+        }
+        for (var i = 0; i < _tabButtons.Count; i++)
+            _tabButtons[i].Button.Visibility = i < fit ? Visibility.Visible : Visibility.Collapsed;
+        _overflow = _tabButtons.Skip(fit).Select(t => t.Module).ToList();
+        _moreButton.Visibility = _overflow.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateMoreButton();
+    }
+
+    private double MoreButtonWidth => SettingsStore.Current.Appearance.TabLabels == "Never" ? 34 : 70;
+
+    /// <summary>"More ▾", or the open tab's icon and name when it's one of the hidden ones.</summary>
+    private void UpdateMoreButton()
+    {
+        if (_moreButton == null) return;
+        var current = _overflow.FirstOrDefault(m => m.Id == _tab);
+        var labels = SettingsStore.Current.Appearance.TabLabels;
+        _moreButton.IsChecked = current != null;
+        // Labels on "Selected" would only show when checked; the More button always names itself.
+        SetTabContent(_moreButton, current?.Glyph ?? Glyphs.More, (current?.ShortTitle ?? "More") + " ▾", labels == "Never" ? "Never" : "Always", _moreButton);
+        _moreButton.Width = labels == "Never" ? 34 : double.NaN;
+        _moreButton.MaxWidth = MoreButtonWidth;
+        _moreButton.ToolTip = current != null ? $"{current.Title} — more tabs" : $"{_overflow.Count} more tab{(_overflow.Count == 1 ? "" : "s")}";
+    }
+
+    private void OpenMoreMenu()
+    {
+        if (_moreButton == null || _overflow.Count == 0) return;
+        var menu = new ContextMenu { PlacementTarget = _moreButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+        foreach (var m in _overflow)
+        {
+            var id = m.Id;
+            var item = new MenuItem
+            {
+                Header = m.Title,
+                Icon = new TextBlock { Text = m.Glyph, Style = (Style)FindResource("Icon"), FontSize = 13 },
+                IsChecked = id == _tab,
+            };
+            item.Click += (_, _) => ShowTab(id);
+            menu.Items.Add(item);
+        }
+        menu.IsOpen = true;
     }
 
     /// <summary>Edit-layout tab strip: every tab as a chip you can drag to reorder, with an eye to show/hide it.</summary>
@@ -834,12 +930,14 @@ public partial class NotchWindow : Window, INotchShell
         TabContent.Content = view;
         if (LayoutEditor.IsEditing) RebuildTabs(); // highlight the current chip
         UpdateEditButtons();
-        foreach (var rb in TabStrip.Children.OfType<RadioButton>())
+        foreach (var (rb, _) in _tabButtons)
         {
             var isThis = (string)rb.Tag == id;
             if (rb.IsChecked != isThis) rb.IsChecked = isThis;
-            if (isThis) rb.BringIntoView();
         }
+        // With labels only on the open tab, widths change as you switch, so re-fit the row.
+        if (SettingsStore.Current.Appearance.TabLabels == "Selected") LayoutTabs();
+        else UpdateMoreButton();
         Fade(TabContent, 0.3, 1, 160, 0);
     }
 
@@ -855,7 +953,10 @@ public partial class NotchWindow : Window, INotchShell
 
     private void UpdateHeader()
     {
-        ClockText.Text = DateTime.Now.ToString("ddd d MMM  HH:mm");
+        var clock = SettingsStore.Current.Clock;
+        ClockText.Visibility = clock.ShowInHeader ? Visibility.Visible : Visibility.Collapsed;
+        ClockText.Text = ClockFormat.Header(DateTime.Now);
+        if (_clockTimer.Interval != ClockFormat.TickInterval) _clockTimer.Interval = ClockFormat.TickInterval;
         var bat = Notch.Battery;
         BatteryPanel.Visibility = bat.HasBattery ? Visibility.Visible : Visibility.Collapsed;
         BatteryText.Text = bat.Text;

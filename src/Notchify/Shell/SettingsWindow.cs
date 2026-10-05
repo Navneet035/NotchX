@@ -236,6 +236,31 @@ public sealed class SettingsWindow : Window
         return sp;
     }
 
+    /// <summary>Clock options, with a live sample of the result.</summary>
+    private static UIElement ClockSection(Action preview)
+    {
+        var c = S.Clock;
+        var sample = Text("", "Body");
+        sample.Margin = new Thickness(0, 2, 0, 6);
+        void Update()
+        {
+            sample.Text = "Looks like: " + ClockFormat.Header(DateTime.Now);
+            preview();
+        }
+        var panel = Page(
+            Header("Clock", "The time and date at the top right of the open notch. The time format also applies to the Home clock card."),
+            Toggle("Show the clock in the open notch", () => c.ShowInHeader, v => c.ShowInHeader = v, Update),
+            Choice("Time format", new[] { ("Same as Windows", "System"), ("12-hour (2:05 PM)", "12h"), ("24-hour (14:05)", "24h") },
+                () => c.TimeFormat, v => c.TimeFormat = v, Update),
+            Toggle("Show seconds", () => c.ShowSeconds, v => c.ShowSeconds = v, Update),
+            Toggle("Show AM / PM", () => c.ShowAmPm, v => c.ShowAmPm = v, Update, "Only matters for 12-hour times"),
+            Choice("Date", new[] { ("Day and date (Sat 4 Oct)", "Short"), ("Day only (Sat)", "Day"), ("Full (Saturday, 4 October)", "Long"), ("Numbers, like Windows (04/10/2026)", "Numeric"), ("No date", "None") },
+                () => c.DateStyle, v => c.DateStyle = v, Update),
+            sample);
+        sample.Text = "Looks like: " + ClockFormat.Header(DateTime.Now);
+        return panel;
+    }
+
     private static StackPanel Indented(StackPanel panel)
     {
         panel.Margin = new Thickness(24, 0, 0, 0);
@@ -317,7 +342,8 @@ public sealed class SettingsWindow : Window
             Header("Text size"),
             Slide("Text & controls", 0.8, 1.4, () => a.UiScale, v => a.UiScale = v, "0.00×", PreviewExpanded, "Scales everything inside the notch — raise the open height if it gets cramped"),
             Choice("Tab labels", new[] { ("Always", "Always"), ("Only on the open tab", "Selected"), ("Never (icons only)", "Never") },
-                () => a.TabLabels, v => a.TabLabels = v, PreviewExpanded, "Names under the tab icons. The tab row scrolls sideways when they don't all fit"),
+                () => a.TabLabels, v => a.TabLabels = v, PreviewExpanded, "Names under the tab icons. Tabs that don't fit go into “More ▾” at the end of the row"),
+            ClockSection(PreviewExpanded),
             Header("Frosted glass", "Blurs whatever is behind the open notch, like Windows 11's own flyouts."),
             Toggle("Frosted glass", () => a.Glass, v => a.Glass = v, PreviewExpanded),
             glassNote,

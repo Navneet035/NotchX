@@ -25,6 +25,20 @@ public sealed class AppSettings
     public KeepAwakeSettings KeepAwake { get; set; } = new();
     public CuelySettings Cuely { get; set; } = new();
     public DocumentSettings Documents { get; set; } = new();
+    public ClockSettings Clock { get; set; } = new();
+}
+
+public sealed class ClockSettings
+{
+    /// <summary>Clock at the top right of the open notch.</summary>
+    public bool ShowInHeader { get; set; } = true;
+    /// <summary>"System" (follow Windows), "12h" or "24h".</summary>
+    public string TimeFormat { get; set; } = "System";
+    public bool ShowSeconds { get; set; } = false;
+    /// <summary>AM/PM after a 12-hour time.</summary>
+    public bool ShowAmPm { get; set; } = true;
+    /// <summary>Date next to the header clock: "None", "Day" (Sat), "Short" (Sat 4 Oct), "Long" (Saturday, 4 October) or "Numeric" (Windows' short date).</summary>
+    public string DateStyle { get; set; } = "Short";
 }
 
 public sealed class DocumentSettings
