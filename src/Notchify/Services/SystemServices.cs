@@ -385,16 +385,16 @@ public static class PlaceTime
         return Zones[id] = z;
     }
 
-    /// <summary>"Same time", "+11h 30m · tomorrow", "−7h · yesterday".</summary>
+    /// <summary>Short enough for a narrow card: "Same time", "+3h", "+11:30 · Mon", "−7h · Sat" (day only when it differs).</summary>
     public static string Difference(DateTimeOffset there)
     {
         var here = DateTimeOffset.Now;
         var diff = there.Offset - here.Offset;
-        var day = (there.Date - here.Date).Days switch { 1 => " · tomorrow", -1 => " · yesterday", _ => "" };
+        var day = there.Date != here.Date ? $" · {there:ddd}" : "";
         if (diff == TimeSpan.Zero) return "Same time" + day;
         var sign = diff > TimeSpan.Zero ? "+" : "−";
         var abs = diff.Duration();
-        var text = abs.Minutes == 0 ? $"{sign}{(int)abs.TotalHours}h" : $"{sign}{(int)abs.TotalHours}h {abs.Minutes}m";
+        var text = abs.Minutes == 0 ? $"{sign}{(int)abs.TotalHours}h" : $"{sign}{(int)abs.TotalHours}:{abs.Minutes:00}";
         return text + day;
     }
 }

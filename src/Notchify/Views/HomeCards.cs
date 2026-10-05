@@ -439,24 +439,31 @@ public static class HomeCards
             foreach (var place in places)
             {
                 var pw = weather.World.FirstOrDefault(x => x.Place.Latitude == place.Latitude && x.Place.Longitude == place.Longitude);
-                var name = Text(place.Name, "Body", 12.5);
-                name.FontWeight = FontWeights.SemiBold;
-                var diff = Text("", "Caption", 10.5);
-                var left = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { name, diff } };
-                var temp = Text(pw == null ? "" : $"{pw.Icon} {pw.Temperature}", "Body", 12);
+                // Line 1: the city, full width and bright, with the weather on the right.
+                var name = Text(place.Name, "Title", 13.5);
+                name.VerticalAlignment = VerticalAlignment.Center;
+                var temp = Text(pw == null ? "" : $"{pw.Icon} {pw.Temperature}", "Body", 12.5);
                 temp.FontFamily = new FontFamily("Segoe UI Emoji, Segoe UI Variable Text");
                 temp.VerticalAlignment = VerticalAlignment.Center;
-                temp.Margin = new Thickness(8, 0, 10, 0);
+                temp.Margin = new Thickness(8, 0, 0, 0);
                 temp.ToolTip = pw?.Condition;
+                // Line 2: the local time, then how far ahead or behind it is.
                 var time = Text("", "Title", 15);
                 time.Typography.NumeralAlignment = FontNumeralAlignment.Tabular;
-                time.VerticalAlignment = VerticalAlignment.Center;
+                time.TextTrimming = TextTrimming.None;
+                var diff = Text("", "Caption", 11);
+                diff.TextTrimming = TextTrimming.None;
+                diff.Margin = new Thickness(0, 0, 0, 1);
+                diff.VerticalAlignment = VerticalAlignment.Bottom;
+                time.Margin = new Thickness(0, 0, 8, 0);
+                // Side by side when there's room; on a narrow card the difference drops below the time instead of overlapping.
+                var second = new WrapPanel { Margin = new Thickness(0, 1, 0, 0), Children = { time, diff } };
                 var row = new Border
                 {
                     CornerRadius = new CornerRadius(10),
-                    Padding = new Thickness(10, 5, 10, 5),
+                    Padding = new Thickness(10, 6, 10, 6),
                     Margin = new Thickness(0, 0, 0, 4),
-                    Child = Columns((left, Star()), (temp, Auto), (time, Auto)),
+                    Child = new StackPanel { Children = { Columns((name, Star()), (temp, Auto)), second } },
                     ToolTip = place.FullName,
                 };
                 rows.Children.Add(row);
