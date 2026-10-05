@@ -79,7 +79,14 @@ public sealed class SettingsWindow : Window
             var label = new TextBlock { Text = key, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
             var icon = Icon(glyph, 13);
             icon.Width = 18;
-            _nav.Items.Add(new ListBoxItem { Tag = key, Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { icon, label } } });
+            icon.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding(nameof(Foreground))
+                { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.FindAncestor, typeof(ListBoxItem), 1) });
+            _nav.Items.Add(new ListBoxItem
+            {
+                Tag = key,
+                Style = (Style)FindResource("NavItem"),
+                Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { icon, label } },
+            });
         }
         _nav.SelectionChanged += (_, _) =>
         {
@@ -93,9 +100,79 @@ public sealed class SettingsWindow : Window
         _nav.SelectedIndex = 0;
         ScrollViewer.SetVerticalScrollBarVisibility(_nav, ScrollBarVisibility.Auto);
 
-        var grid = Columns((new Border { Child = _nav, Padding = new Thickness(10, 12, 6, 12) }, Auto), (new Border { Child = _page, Padding = new Thickness(10, 14, 0, 0) }, Star()));
+        // A slightly darker sidebar with a hairline edge, like the notch's own glass panels.
+        var sidebar = new Border
+        {
+            Child = _nav,
+            Padding = new Thickness(10, 14, 8, 12),
+            Background = new SolidColorBrush(Color.FromArgb(0x40, 0, 0, 0)),
+            BorderThickness = new Thickness(0, 0, 1, 0),
+        };
+        sidebar.SetResourceReference(Border.BorderBrushProperty, "DividerBrush");
+        var grid = Columns((sidebar, Auto), (new Border { Child = _page, Padding = new Thickness(22, 16, 0, 0) }, Star()));
         Content = grid;
         Closed += (_, _) => SettingsStore.SaveNow();
+    }
+
+    /// <summary>Rebuild the open page, e.g. after a theme changed several of its values at once.</summary>
+    private void RefreshPage()
+    {
+        if (_nav.SelectedItem is not ListBoxItem { Tag: string key }) return;
+        var scroll = (_page.Content as ScrollViewer)?.VerticalOffset ?? 0;
+        var stack = new StackPanel { Margin = new Thickness(4, 0, 18, 24) };
+        stack.Children.Add(Text(key, "Big", 22));
+        stack.Children.Add(_pages.First(p => p.Key == key).Build());
+        var viewer = Scroll(stack);
+        _page.Content = viewer;
+        viewer.Loaded += (_, _) => viewer.ScrollToVerticalOffset(scroll);
+    }
+
+    /// <summary>A row of theme previews: the notch's gradient with an accent dot; the current one is outlined.</summary>
+    private static UIElement ThemeSwatches(Action applied)
+    {
+        var wrap = new WrapPanel { Margin = new Thickness(0, 2, 0, 4) };
+        var current = ThemePresets.Current;
+        foreach (var t in ThemePresets.All)
+        {
+            var theme = t;
+            var bg = Ui.Color(t.Background);
+            var gr = Ui.Color(t.Gradient);
+            bg.A = gr.A = 255;
+            var rad = t.Angle * Math.PI / 180;
+            var fill = new LinearGradientBrush(bg, gr, new Point(0.5 - Math.Cos(rad) / 2, 0.5 - Math.Sin(rad) / 2), new Point(0.5 + Math.Cos(rad) / 2, 0.5 + Math.Sin(rad) / 2));
+            var preview = new Grid { Width = 92, Height = 46 };
+            preview.Children.Add(new Border { Background = fill, CornerRadius = new CornerRadius(10) });
+            preview.Children.Add(new Border { BorderBrush = (Brush)Application.Current.FindResource("CardStrokeBrush"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10) });
+            preview.Children.Add(new System.Windows.Shapes.Ellipse
+            {
+                Width = 12, Height = 12, Fill = Ui.Brush(t.Accent),
+                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 8, 8),
+            });
+            var label = Text(t.Name, "Caption");
+            label.HorizontalAlignment = HorizontalAlignment.Center;
+            label.Margin = new Thickness(0, 5, 0, 0);
+            var ring = new Border
+            {
+                CornerRadius = new CornerRadius(13),
+                BorderThickness = new Thickness(2),
+                Padding = new Thickness(2),
+                Child = preview,
+                BorderBrush = theme == current ? Ui.Brush(t.Accent) : Brushes.Transparent,
+            };
+            var tile = new Button
+            {
+                Style = (Style)Application.Current.FindResource("ChipButton"),
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                Padding = new Thickness(4),
+                Margin = new Thickness(0, 0, 6, 6),
+                ToolTip = t.Description,
+                Content = new StackPanel { Children = { ring, label } },
+            };
+            tile.Click += (_, _) => { ThemePresets.Apply(theme); applied(); };
+            wrap.Children.Add(tile);
+        }
+        return wrap;
     }
 
     /// <summary>Jump to a page by name ("Home", "Screen Capture", …).</summary>
@@ -332,6 +409,8 @@ public sealed class SettingsWindow : Window
         glassNote.Visibility = GlassBackdrop.SystemAllowsBlur ? Visibility.Collapsed : Visibility.Visible;
 
         return Page(
+            Header("Theme", "One click sets the background, gradient and accent together. Fine-tune them further down."),
+            ThemeSwatches(() => { PreviewExpanded(); RefreshPage(); }),
             Header("Size & shape", "Drag the sliders — the notch updates live."),
             Choice("Style", new[] { "Notch", "Pill" }, () => a.Style, v => a.Style = v, hint: "Notch hugs the top edge; Pill floats with round corners"),
             Slide("Collapsed width (length)", 100, 400, () => a.CollapsedWidth, v => a.CollapsedWidth = v),

@@ -650,6 +650,47 @@
         </Setter>
     </Style>
 
+    <!-- Sidebar navigation (Settings): quiet rows; the open page gets the same accent capsule as the notch's tabs. -->
+    <Style TargetType="ListBoxItem" x:Key="NavItem">
+        <Setter Property="Foreground" Value="{DynamicResource SubtleTextBrush}" />
+        <Setter Property="Margin" Value="0,0,0,2" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Grid>
+                        <Border x:Name="Veil" Background="{DynamicResource HoverVeilBrush}" CornerRadius="9" Opacity="0" />
+                        <Grid x:Name="Sel" Opacity="0">
+                            <Border Background="{DynamicResource AccentBrush}" Opacity="0.16" CornerRadius="9" />
+                            <Border BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1" CornerRadius="9" />
+                        </Grid>
+                        <ContentPresenter Margin="10,7" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard><DoubleAnimation Storyboard.TargetName="Veil" Storyboard.TargetProperty="Opacity" To="1" Duration="{StaticResource FastDuration}" /></Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard><DoubleAnimation Storyboard.TargetName="Veil" Storyboard.TargetProperty="Opacity" To="0" Duration="{StaticResource SlowDuration}" /></Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Sel" Property="Opacity" Value="1" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ============ ComboBox ============ -->
     <Style TargetType="ComboBoxItem">
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
