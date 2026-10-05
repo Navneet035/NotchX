@@ -44,30 +44,43 @@ public sealed class SpacesService : ObservableObject
         else _poll.Stop();
     }
 
+    /// <summary>Desktop ids in Task View order, plus the current one. Empty list = Windows hasn't written one (single desktop).</summary>
+    public static (List<Guid> Ids, Guid Current) ReadState()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(Key);
+        var ids = ReadGuids(key?.GetValue("VirtualDesktopIDs") as byte[]);
+        var current = ReadGuids(key?.GetValue("CurrentVirtualDesktop") as byte[]).FirstOrDefault();
+        if (current == Guid.Empty)
+        {
+            // Older builds keep the current desktop per session.
+            using var session = Registry.CurrentUser.OpenSubKey(
+                $@"Software\Microsoft\Windows\CurrentVersion\Explorer\SessionInfo\{System.Diagnostics.Process.GetCurrentProcess().SessionId}\VirtualDesktops");
+            current = ReadGuids(session?.GetValue("CurrentVirtualDesktop") as byte[]).FirstOrDefault();
+        }
+        return (ids, current);
+    }
+
+    /// <summary>The name set in Task View, or "Desktop N".</summary>
+    public static string DesktopName(Guid id, int index)
+    {
+        string? name = null;
+        if (id != Guid.Empty)
+        {
+            using var d = Registry.CurrentUser.OpenSubKey($@"{Key}\Desktops\{id:B}");
+            name = d?.GetValue("Name") as string;
+        }
+        return string.IsNullOrWhiteSpace(name) ? $"Desktop {index + 1}" : name;
+    }
+
     public void Refresh(bool announce)
     {
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(Key);
-            var ids = ReadGuids(key?.GetValue("VirtualDesktopIDs") as byte[]);
-            var current = ReadGuids(key?.GetValue("CurrentVirtualDesktop") as byte[]).FirstOrDefault();
-            if (current == Guid.Empty)
-            {
-                // Older builds keep the current desktop per session.
-                using var session = Registry.CurrentUser.OpenSubKey(
-                    $@"Software\Microsoft\Windows\CurrentVersion\Explorer\SessionInfo\{System.Diagnostics.Process.GetCurrentProcess().SessionId}\VirtualDesktops");
-                current = ReadGuids(session?.GetValue("CurrentVirtualDesktop") as byte[]).FirstOrDefault();
-            }
+            var (ids, current) = ReadState();
             // With a single desktop Windows doesn't write the list at all.
             var count = Math.Max(1, ids.Count);
             var index = Math.Max(0, ids.IndexOf(current));
-            string? name = null;
-            if (current != Guid.Empty)
-            {
-                using var d = Registry.CurrentUser.OpenSubKey($@"{Key}\Desktops\{current:B}");
-                name = d?.GetValue("Name") as string;
-            }
-            name = string.IsNullOrWhiteSpace(name) ? $"Desktop {index + 1}" : name;
+            var name = DesktopName(current, index);
 
             var changed = index != Index || count != Count || name != Name;
             var switched = index != Index || name != Name;
@@ -96,6 +109,23 @@ public sealed class SpacesService : ObservableObject
         if (bytes == null) return list;
         for (var i = 0; i + 16 <= bytes.Length; i += 16) list.Add(new Guid(bytes.AsSpan(i, 16)));
         return list;
+    }
+
+    /// <summary>Jump to the desktop at <paramref name="target"/> (Task View order) by stepping with Win+Ctrl+←/→.</summary>
+    public void SwitchTo(int target)
+    {
+        Refresh(false);
+        var steps = target - Index;
+        if (steps == 0) return;
+        var key = steps > 0 ? VK_RIGHT : VK_LEFT;
+        Task.Run(async () =>
+        {
+            for (var i = 0; i < Math.Abs(steps); i++)
+            {
+                Native.SendChord(Native.VK_LWIN, Native.VK_CONTROL, key);
+                await Task.Delay(140);
+            }
+        });
     }
 
     public void Next() => Native.SendChord(Native.VK_LWIN, Native.VK_CONTROL, VK_RIGHT);

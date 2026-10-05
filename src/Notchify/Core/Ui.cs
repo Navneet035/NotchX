@@ -235,6 +235,8 @@ public static class Glyphs
     public const string Crop = "";
     public const string Usb = "";
     public const string Apps = "";
+    public const string TaskView = "";
+    public const string Minimize = "";
     public const string Note = "";
     public const string Edit = "";
     public const string Lock = "";

@@ -65,6 +65,8 @@ public sealed class SpacesSettings
 {
     /// <summary>Show an island with the desktop's name when switching virtual desktops.</summary>
     public bool ShowIsland { get; set; } = true;
+    /// <summary>Desktops tab: one row per app ("Chrome ×3") instead of one per window.</summary>
+    public bool GroupByApp { get; set; } = false;
 }
 
 public sealed class KeepAwakeSettings
@@ -107,6 +109,8 @@ public sealed class AppearanceSettings
     public double BackgroundImageOpacity { get; set; } = 0.5;
     /// <summary>Scales text and controls inside the notch (0.8–1.4).</summary>
     public double UiScale { get; set; } = 1.0;
+    /// <summary>Text under the tab icons: "Always", "Selected" (only the open tab) or "Never".</summary>
+    public string TabLabels { get; set; } = "Always";
     /// <summary>-1 = primary display, otherwise index into the screen list.</summary>
     public int DisplayIndex { get; set; } = -1;
     public bool AnimationsEnabled { get; set; } = true;

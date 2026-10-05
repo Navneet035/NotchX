@@ -30,6 +30,7 @@ public static class HomeCards
         "camera" => Camera(),
         "screentime" => ScreenTime(),
         "spaces" => Spaces(),
+        "windows" => OpenWindows(),
         "timer" => Timer(),
         "system" => SystemStats(),
         "launcher" => Launcher(),
@@ -408,6 +409,55 @@ public static class HomeCards
         };
         var card = CardOf(Columns((Icon(Glyphs.Apps, 18), Px(30)), (info, Star()), (buttons, Auto)));
         WhileVisible(card, sp.Acquire, sp.Release);
+        return card;
+    }
+
+    /// <summary>The current desktop's windows as app icons; click to jump, right-click for more. "All" opens the Desktops tab.</summary>
+    private static FrameworkElement OpenWindows()
+    {
+        var list = Notch.Windows;
+        var title = Text("", "SectionHeader");
+        title.VerticalAlignment = VerticalAlignment.Center;
+        title.Margin = new Thickness(2, 0, 0, 0);
+        var all = Small(Glyphs.TaskView, "All desktops", () => Notch.Shell.OpenTab("desktops"));
+        var head = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
+        DockPanel.SetDock(all, Dock.Right);
+        head.Children.Add(all);
+        head.Children.Add(title);
+        var icons = new WrapPanel();
+        var empty = Faint("Nothing open on this desktop");
+
+        void Render()
+        {
+            var d = list.Current;
+            var others = list.Desktops.Where(x => !x.IsCurrent).Sum(x => x.Windows.Count);
+            title.Text = $"{(d?.Name ?? "This desktop").ToUpperInvariant()} · {d?.Windows.Count ?? 0}" + (others > 0 ? $"  (+{others} elsewhere)" : "");
+            icons.Children.Clear();
+            empty.Visibility = d is { Windows.Count: > 0 } ? Visibility.Collapsed : Visibility.Visible;
+            if (d == null) return;
+            foreach (var w in d.Windows)
+            {
+                var b = new Button
+                {
+                    Style = S("ChipButton"),
+                    Width = 38,
+                    Height = 38,
+                    Padding = new Thickness(0),
+                    Margin = new Thickness(0, 0, 4, 4),
+                    Content = new Image { Source = w.Icon, Width = 22, Height = 22, Opacity = w.Minimized ? 0.5 : 1 },
+                    ToolTip = $"{w.Title}\n{w.App}{(w.Minimized ? " · minimised" : "")}",
+                    ContextMenu = DesktopsModule.WindowMenu(w, d),
+                };
+                b.Click += (_, _) => WindowListService.Activate(w);
+                icons.Children.Add(b);
+            }
+        }
+
+        var card = CardOf(Layout(head, ScrollList(new StackPanel { Children = { icons, empty } })));
+        void OnChanged() => Ui.Post(Render);
+        WhileVisible(card,
+            () => { list.Changed += OnChanged; list.Acquire(); Render(); },
+            () => { list.Changed -= OnChanged; list.Release(); });
         return card;
     }
 

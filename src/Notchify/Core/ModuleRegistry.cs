@@ -67,6 +67,7 @@ public sealed class ModuleRegistry
         new NotesModule(),
         new CalendarModule(),
         new LauncherModule(),
+        new DesktopsModule(),
         new SearchModule(),
         new SnippetsModule(),
         new SoundModule(),

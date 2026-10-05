@@ -17,6 +17,7 @@ public sealed class AiUsageModule : NotchModule
 
     public override string Id => "ai";
     public override string Title => "AI Usage";
+    public override string ShortTitle => "AI";
     public override string Glyph => Glyphs.Robot;
     public override string Description => "Rate-limit windows, tokens and cost for Claude Code, Codex and Copilot — from local logs or an API token.";
 

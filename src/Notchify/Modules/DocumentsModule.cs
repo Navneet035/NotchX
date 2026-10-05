@@ -22,6 +22,7 @@ public sealed class DocumentsModule : NotchModule
 
     public override string Id => "documents";
     public override string Title => "Documents";
+    public override string ShortTitle => "Docs";
     public override string Glyph => Glyphs.Document;
     public override string Description => "Convert Word ⇄ PDF and edit PDFs: reorder, rotate, delete, merge, split, add text, page numbers and a password.";
 

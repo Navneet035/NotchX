@@ -33,4 +33,5 @@ public static class Notch
     public static DeveloperApiService DeveloperApi { get; } = new();
     public static ScreenTimeService ScreenTime { get; } = new();
     public static SpacesService Spaces { get; } = new();
+    public static WindowListService Windows { get; } = new();
 }

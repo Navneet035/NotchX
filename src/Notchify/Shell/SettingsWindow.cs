@@ -310,6 +310,8 @@ public sealed class SettingsWindow : Window
             Slide("Corner radius", 0, 40, () => a.CornerRadius, v => a.CornerRadius = v, after: PreviewExpanded),
             Header("Text size"),
             Slide("Text & controls", 0.8, 1.4, () => a.UiScale, v => a.UiScale = v, "0.00×", PreviewExpanded, "Scales everything inside the notch — raise the open height if it gets cramped"),
+            Choice("Tab labels", new[] { ("Always", "Always"), ("Only on the open tab", "Selected"), ("Never (icons only)", "Never") },
+                () => a.TabLabels, v => a.TabLabels = v, PreviewExpanded, "Names under the tab icons. The tab row scrolls sideways when they don't all fit"),
             Header("Frosted glass", "Blurs whatever is behind the open notch, like Windows 11's own flyouts."),
             Toggle("Frosted glass", () => a.Glass, v => a.Glass = v, PreviewExpanded),
             glassNote,

@@ -19,6 +19,7 @@ public sealed class NowPlayingModule : NotchModule
 
     public override string Id => "music";
     public override string Title => "Now Playing";
+    public override string ShortTitle => "Music";
     public override string Glyph => Glyphs.Music;
     public override string Description => "Media controls, album art, scrubbing, speed, app volume, live spectrum and synced lyrics.";
 

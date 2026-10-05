@@ -213,10 +213,18 @@ public partial class NotchWindow : Window, INotchShell
             Native.SetWindowDisplayAffinity(_hwnd, affinity);
             _glass.SetExcludedFromCapture(s.Behavior.HideFromScreenCapture);
         }
+        if (a.TabLabels != _tabLabels)
+        {
+            var first = _tabLabels == null;
+            _tabLabels = a.TabLabels;
+            if (!first) RebuildTabs();
+        }
         PositionWindow();
         RefreshSize(animate: false);
         UpdateFill();
     }
+
+    private string? _tabLabels;
 
     private static Brush BuildPanelBrush(AppearanceSettings a, bool glass)
     {
@@ -647,6 +655,9 @@ public partial class NotchWindow : Window, INotchShell
         TabStrip.Children.Clear();
         if (LayoutEditor.IsEditing) { BuildEditableTabs(); return; }
         var index = 1;
+        var labels = SettingsStore.Current.Appearance.TabLabels;
+        var withLabels = labels != "Never";
+        Header.Height = withLabels ? 44 : 32;
         foreach (var m in Notch.Modules.Tabs)
         {
             var id = m.Id;
@@ -659,6 +670,33 @@ public partial class NotchWindow : Window, INotchShell
                 ToolTip = index <= 9 ? $"{m.Title}  (Ctrl+{index})" : m.Title,
                 IsChecked = id == _tab,
             };
+            if (withLabels)
+            {
+                // Icon with its name underneath, so you can tell the tabs apart without opening them.
+                var label = new TextBlock
+                {
+                    Text = m.ShortTitle,
+                    FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI"),
+                    FontSize = 9.5,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 1, 0, 0),
+                };
+                if (labels == "Selected")
+                    label.SetBinding(VisibilityProperty, new System.Windows.Data.Binding(nameof(RadioButton.IsChecked))
+                        { Source = rb, Converter = Notchify.Controls.Converters.Visible });
+                rb.Content = new StackPanel
+                {
+                    Children =
+                    {
+                        new TextBlock { Text = m.Glyph, FontSize = 14, HorizontalAlignment = HorizontalAlignment.Center },
+                        label,
+                    },
+                };
+                rb.Width = double.NaN;
+                rb.MinWidth = 40;
+                rb.Height = 40;
+                rb.Padding = new Thickness(6, 0, 6, 0);
+            }
             rb.Checked += (_, _) => ShowTab(id);
             TabStrip.Children.Add(rb);
             index++;

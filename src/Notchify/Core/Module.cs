@@ -15,6 +15,8 @@ public abstract class NotchModule
     public abstract string Id { get; }
     public abstract string Title { get; }
     public abstract string Glyph { get; }
+    /// <summary>Label under the tab icon; keep it to one short word.</summary>
+    public virtual string ShortTitle => Title;
     public virtual string Description => "";
     public virtual bool HasTab => true;
     public virtual bool DefaultEnabled => true;
