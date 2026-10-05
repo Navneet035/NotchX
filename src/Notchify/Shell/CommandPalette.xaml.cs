@@ -34,7 +34,10 @@ public partial class CommandPalette : Window
 
         Query.TextChanged += (_, _) => Filter(Query.Text);
         PreviewKeyDown += OnKey;
-        Deactivated += (_, _) => Close();
+        // Closing deactivates the window, which would ask it to close again mid-close (and throw).
+        var closing = false;
+        Closing += (_, _) => closing = true;
+        Deactivated += (_, _) => { if (!closing) Close(); };
         Closed += (_, _) => _open = null;
         Results.MouseUp += (_, _) => Run();
     }

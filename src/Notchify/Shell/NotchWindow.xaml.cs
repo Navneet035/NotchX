@@ -45,6 +45,7 @@ public partial class NotchWindow : Window, INotchShell
 
         _hoverTimer.Tick += (_, _) => { _hoverTimer.Stop(); OnHoverDwell(); };
         _collapseTimer.Tick += (_, _) => { _collapseTimer.Stop(); TryAutoCollapse(); };
+        _leaveWatch.Tick += LeaveWatch_Tick;
         _clockTimer.Tick += (_, _) => UpdateHeader();
         _topmostTimer.Tick += (_, _) => EnsureTopmost();
 
@@ -320,6 +321,7 @@ public partial class NotchWindow : Window, INotchShell
         ShowLayer(ExpandedLayer);
         RefreshSize(animate: true);
         UpdateHeader();
+        StartLeaveWatch();
     }
 
     /// <summary>Which tab the notch opens on: a fixed tab, the last one used, or "smart".</summary>
@@ -341,6 +343,7 @@ public partial class NotchWindow : Window, INotchShell
     public void Collapse()
     {
         _collapseTimer.Stop();
+        _leaveWatch.Stop();
         _peeking = false;
         LayoutEditor.IsEditing = false;
         if (Notch.Hub.Current != null) GoIsland(Notch.Hub.Current);
@@ -632,15 +635,50 @@ public partial class NotchWindow : Window, INotchShell
     /// </summary>
     private bool CursorOverPill()
     {
-        if (Pill.IsMouseOver) return true;
-        if (!Pill.IsVisible || !Native.GetCursorPos(out var p)) return false;
+        // The real cursor position wins: IsMouseOver can stay "true" after a drag or a programmatic open,
+        // when Windows never tells us the mouse left.
+        if (!Pill.IsVisible || !Native.GetCursorPos(out var p)) return Pill.IsMouseOver;
         try
         {
             var topLeft = Pill.PointToScreen(new Point(0, 0));
             var bottomRight = Pill.PointToScreen(new Point(Pill.ActualWidth, Pill.ActualHeight));
             return p.X >= topLeft.X && p.X <= bottomRight.X && p.Y >= topLeft.Y && p.Y <= bottomRight.Y;
         }
-        catch { return false; }
+        catch { return Pill.IsMouseOver; }
+    }
+
+    // ---------------- Leave watchdog ----------------
+    // MouseLeave doesn't always arrive (after drag and drop, or when the notch was opened by a shortcut,
+    // Settings preview or an island without the mouse ever being over it). While open, check the real
+    // cursor a few times a second and close once it has been away for the auto-collapse delay.
+
+    private readonly DispatcherTimer _leaveWatch = new() { Interval = TimeSpan.FromMilliseconds(300) };
+    private DateTime? _awaySince;
+    private bool _seenInside;
+
+    private void StartLeaveWatch()
+    {
+        _awaySince = null;
+        _seenInside = CursorOverPill();
+        _leaveWatch.Start();
+    }
+
+    private void LeaveWatch_Tick(object? sender, EventArgs e)
+    {
+        if (_state != NotchState.Expanded) { _leaveWatch.Stop(); return; }
+        var b = SettingsStore.Current.Behavior;
+        var holding = !b.AutoCollapse || PinToggle.IsChecked == true || LayoutEditor.IsEditing || _dragging
+            || Mouse.Captured != null || (IsActive && Keyboard.FocusedElement is TextBox);
+        if (holding || CursorOverPill())
+        {
+            if (!holding) _seenInside = true;
+            _awaySince = null;
+            return;
+        }
+        _awaySince ??= DateTime.Now;
+        // Opened without the mouse (shortcut, Settings preview): give a few seconds to look before closing.
+        var wait = TimeSpan.FromMilliseconds(_seenInside ? Math.Max(100, b.AutoCollapseDelayMs) : Math.Max(3000, b.AutoCollapseDelayMs));
+        if (DateTime.Now - _awaySince >= wait) Collapse();
     }
 
     private void TryAutoCollapse()
