@@ -1150,8 +1150,11 @@ public partial class NotchWindow : Window, INotchShell
         {
             Directory.CreateDirectory(folder);
             await Task.Delay(6000); // let music, weather and devices load first
-            // Hold the notch open without pressing the pin, so the pin doesn't show as "on" in the pictures.
+            // Hold the notch open without pressing the pin, so the pin doesn't show as "on" in the pictures,
+            // and ignore the real mouse so whatever it rests on doesn't show a hover highlight.
             _holdForShots = true;
+            Header.IsHitTestVisible = false;
+            Mouse.Synchronize();
             foreach (var (file, tab) in new[] { ("home", "home"), ("now-playing", "music"), ("desktops", "desktops"), ("launcher", "launcher"), ("documents", "documents") })
             {
                 if (Notch.Modules.Tabs.All(t => t.Id != tab)) continue;
@@ -1160,6 +1163,7 @@ public partial class NotchWindow : Window, INotchShell
                 SaveShot(System.IO.Path.Combine(folder, file + ".png"), Pill);
             }
             _holdForShots = false;
+            Header.IsHitTestVisible = true;
             Collapse();
             await Task.Delay(1400);
             SaveShot(System.IO.Path.Combine(folder, "pill.png"), Pill);
@@ -1172,7 +1176,7 @@ public partial class NotchWindow : Window, INotchShell
             Log.Info("README screenshots saved to " + folder);
         }
         catch (Exception ex) { Log.Error("README screenshots", ex); }
-        finally { _holdForShots = false; }
+        finally { _holdForShots = false; Header.IsHitTestVisible = true; }
     }
 
     private bool _holdForShots;

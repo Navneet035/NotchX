@@ -55,22 +55,25 @@ This project was **inspired by [Notchy](https://notchy.dev) for macOS**, but it 
 
 ### Make it yours
 - **Size & shape** — width and height (closed and open), corner radius.
-- **Colours** — solid black (default), any colour, a gradient, or your own picture; accent colour.
+- **Themes** — Graphite, Midnight, Aurora, Ember, Lime, Rose or Pure black in one click; everything stays adjustable.
+- **Colours** — solid black, any colour, a gradient, or your own picture; accent colour, and a separate tab-highlight colour and strength.
 - **Frosted glass** — optional live blur of what's behind the open notch, with tint and a sheen-and-rim highlight.
 - **Text size** — scale everything inside the notch.
 - **Animations** — springy open / close, adjustable speed, or off.
-- **Tabs** — show, hide and reorder them (in the notch or in Settings); turn any feature off completely.
+- **Tabs** — named icons; show, hide and reorder them (in the notch or in Settings); tabs that don't fit go on a second row or into a **More ▾** menu; turn any feature off completely.
+- **Clock** — 12- or 24-hour, seconds, AM/PM and date style.
+- **Your own icons** — give any Launcher or Shelf item a custom picture.
 - **Settings** — 26 pages, every change previews live, and everything is also in a plain `settings.json` you can edit.
 
 ### A Home page you design
-- **20 cards** — clock, weather, Now Playing, volume & output, brightness, quick toggles, sound & brightness (all-in-one), Bluetooth, battery, reminders, calendar, notes, clipboard, shelf, camera, screen time, Spaces (virtual desktops), timer, system stats and apps.
+- **22 cards** — clock, weather, world clocks, Now Playing, volume & output, brightness, quick toggles, sound & brightness (all-in-one), Bluetooth, battery, reminders, calendar, notes, clipboard, shelf, camera, screen time, Spaces (virtual desktops), open windows, timer, system stats and apps.
 - **Arrange them in the notch** — click ✎, then **+ Add card**; move, resize (width and height), remove or drag cards onto each other.
 - **Or in Settings › Home** — with a live preview of the layout.
 - Cards sit on a 12-column grid; short cards slide in under tall ones, and extra rows scroll.
 
 ### Music & sound
 - **Now Playing** — Spotify, YouTube Music / YouTube in any browser, Apple Music, Media Player and anything else in Windows' media controls.
-- Album art, scrubbing, shuffle, repeat, per-app volume, and playback speed for browser videos.
+- Album art, scrubbing, shuffle, repeat, per-app volume, and playback speed for browser videos. Click the album art to jump to the app that's playing.
 - **Live audio spectrum** — real analysis of what you hear, in the tab and optionally on the pill.
 - **Synced lyrics** (LRCLIB), in the tab or line-by-line on the pill.
 - **Sound mixer** — volume and mute per app, without touching the system volume.
@@ -123,11 +126,17 @@ This project was **inspired by [Notchy](https://notchy.dev) for macOS**, but it 
 - **Do Not Disturb** — follows Windows Focus; low-priority islands stay quiet.
 - **Screen time** — today's time on the PC and your top apps; idle time and the lock screen don't count.
 - **Spaces** — see which virtual desktop you're on, switch, add one or open Task view; an island names the desktop when you switch.
+- **Desktops tab** — every virtual desktop with the apps and windows open on it. Click to jump to a window, drag windows (or a Ctrl+click selection) onto another desktop to move them, or minimise and close them from the list.
+- **Weather & world clocks** — search for any city as you type, keep a list of places, and see each one's time, how far ahead or behind it is, and its weather.
 - **Window snapping** — drag a window to the notch and drop it on a layout zone (optional).
 - **Terminal** — a drop-down Windows Terminal from the top edge (or a normal window), with show, hide and close.
 - **System stats** — CPU, memory, network and disk with live graphs.
 - **Lock screen** in one click, **keyboard cleaning lock** (60 s, `Ctrl+Esc` unlocks) and a **keystroke HUD** for presentations (password fields are never shown).
 - **Permissions page** — see at a glance whether camera, microphone and location are allowed, with links to fix them.
+
+<p align="center">
+  <img src="docs/images/desktops.png" width="820" alt="The Desktops tab: each virtual desktop with its open windows" />
+</p>
 
 ### For developers
 - **Local API** — `127.0.0.1` only, token-protected, off by default; scripts, CI and shells can show their own islands.
