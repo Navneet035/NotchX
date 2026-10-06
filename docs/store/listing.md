@@ -90,6 +90,13 @@ virtual desktops
 widgets
 ```
 
+### Store logos
+
+From `docs/store/logos/`:
+
+- **1:1 logo, 300×300:** `store-logo-300.png` (the app icon)
+- **1:1 box art, if asked for a larger square:** `box-art-1080.png` or `box-art-2160.png` (the icon on the dark notch background)
+
 ### Screenshots (Desktop)
 
 Upload in this order, from `docs/store/screenshots/` (1920×1080):
