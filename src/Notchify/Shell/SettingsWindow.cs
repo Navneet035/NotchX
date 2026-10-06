@@ -590,13 +590,7 @@ public sealed class SettingsWindow : Window
         var packed = LayoutEditor.Pack(LayoutEditor.HomeCards());
         var rows = packed.Count == 0 ? 1 : packed.Max(p => p.Row + Math.Clamp(p.Card.Rows, 1, LayoutEditor.MaxRows));
         canvas.Height = rows * unitH + (rows - 1) * gap;
-        // The two rows that are visible without scrolling.
-        canvas.Children.Add(new Border
-        {
-            Width = canvas.Width + 8, Height = 2 * unitH + gap + 8, CornerRadius = new CornerRadius(10),
-            BorderBrush = (Brush)Application.Current.FindResource("DividerBrush"), BorderThickness = new Thickness(1),
-            Margin = new Thickness(-4, -4, 0, 0), ToolTip = "Visible without scrolling",
-        });
+        const int visibleRows = 2; // what the open notch shows before you scroll
         foreach (var (card, col, row) in packed)
         {
             var info = LayoutEditor.Info(card.Type);
@@ -605,17 +599,59 @@ public sealed class SettingsWindow : Window
             var label = Text(info?.Name ?? card.Type, "Caption", 10);
             label.HorizontalAlignment = HorizontalAlignment.Center;
             label.VerticalAlignment = VerticalAlignment.Center;
+            if (row < visibleRows && row + Math.Clamp(card.Rows, 1, LayoutEditor.MaxRows) > visibleRows)
+            {
+                // A card crossing the fold: name it in its visible part, clear of the line.
+                var visibleHeight = (visibleRows - row) * (unitH + gap) - gap;
+                label.VerticalAlignment = VerticalAlignment.Top;
+                label.Margin = new Thickness(0, Math.Max(0, visibleHeight / 2 - 8), 0, 0);
+            }
             var box = new Border
             {
                 Width = cols * unitW + (cols - 1) * gap,
                 Height = rws * unitH + (rws - 1) * gap,
                 CornerRadius = new CornerRadius(6),
                 Background = (Brush)Application.Current.FindResource("CardHoverBrush"),
+                BorderBrush = (Brush)Application.Current.FindResource("CardStrokeBrush"),
+                BorderThickness = new Thickness(1),
                 Child = label,
+                // Cards entirely below the fold are only reached by scrolling.
+                Opacity = row >= visibleRows ? 0.55 : 1,
             };
             Canvas.SetLeft(box, col * (unitW + gap));
             Canvas.SetTop(box, row * (unitH + gap));
             canvas.Children.Add(box);
+        }
+
+        // The fold: a dashed line where the open notch stops and scrolling starts. Drawn over the cards,
+        // so a tall card crossing it reads as "half visible", not as a card spilling out of a box.
+        if (rows > visibleRows)
+        {
+            var y = visibleRows * (unitH + gap) - gap / 2;
+            var fold = new System.Windows.Shapes.Line
+            {
+                X1 = -4, X2 = canvas.Width + 10, Y1 = y, Y2 = y,
+                StrokeThickness = 1.5,
+                StrokeDashArray = new DoubleCollection { 4, 3 },
+                Stroke = (Brush)Application.Current.FindResource("SubtleTextBrush"),
+                ToolTip = "Above the line shows when the notch opens; scroll down in the notch for the rest",
+            };
+            canvas.Children.Add(fold);
+            var tag = new Border
+            {
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(6, 1, 6, 1),
+                Background = (Brush)Application.Current.FindResource("PanelBrush"),
+                BorderBrush = (Brush)Application.Current.FindResource("DividerBrush"),
+                BorderThickness = new Thickness(1),
+                Child = Text("scroll ↓", "Caption", 10),
+            };
+            // Just past the right edge, at the end of the line, so it never covers a card.
+            tag.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            Canvas.SetLeft(tag, canvas.Width + 10);
+            Canvas.SetTop(tag, y - tag.DesiredSize.Height / 2);
+            canvas.Children.Add(tag);
+            return new Border { Child = canvas, Padding = new Thickness(4, 4, 4 + 10 + tag.DesiredSize.Width, 4), HorizontalAlignment = HorizontalAlignment.Left };
         }
         return new Border { Child = canvas, Padding = new Thickness(4), HorizontalAlignment = HorizontalAlignment.Left };
     }
