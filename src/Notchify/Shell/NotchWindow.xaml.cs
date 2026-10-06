@@ -1215,20 +1215,25 @@ public partial class NotchWindow : Window, INotchShell
             Collapse();
             await Task.Delay(3000);        // time for the palette to close and the recording to settle
 
-            async Task Show(string tab, int ms)
+            // Captions only appear in a recorded video (RecordDemoTourAsync), never on screen.
+            async Task Show(string tab, int ms, string caption)
             {
-                if (Notch.Modules.Tabs.Any(t => t.Id == tab)) { OpenTab(tab); await Task.Delay(ms); }
+                if (Notch.Modules.Tabs.All(t => t.Id != tab)) return;
+                TourCaption = caption;
+                OpenTab(tab);
+                await Task.Delay(ms);
             }
+            TourCaption = "NotchX: a Dynamic Island for Windows";
             await Task.Delay(1500);        // the closed pill, with what's playing
-            await Show("home", 4500);
-            await Show("music", 5000);
-            await Show("desktops", 4000);
-            await Show("launcher", 3000);
-            await Show("shelf", 3000);
-            await Show("documents", 3000);
+            await Show("home", 4500, "Everything you need, one hover away");
+            await Show("music", 5000, "Your music, right at the top");
+            await Show("desktops", 4000, "Every desktop at a glance");
+            await Show("launcher", 3000, "Your apps, one click away");
+            await Show("shelf", 3000, "A shelf for your files");
+            await Show("documents", 3000, "Convert and edit documents on your PC");
 
             // Themes, on Home so the cards show them off.
-            await Show("home", 800);
+            await Show("home", 800, "Make it yours");
             foreach (var name in new[] { "Midnight", "Aurora", "Ember", "Lime", "Rose" })
             {
                 if (ThemePresets.All.FirstOrDefault(t => t.Name == name) is { } theme) ThemePresets.Apply(theme);
@@ -1237,10 +1242,13 @@ public partial class NotchWindow : Window, INotchShell
             RestoreTheme();
 
             await Task.Delay(800);
+            TourCaption = "Alerts that don't get in your way";
             Collapse();
             await Task.Delay(1500);
             Notch.Hub.Notify(Glyphs.Stopwatch, "Focus session complete", "Time for a 5-minute break", Ui.Green, IslandPriority.High, 3.5);
             await Task.Delay(4500);
+            TourCaption = "NotchX: free and open source";
+            await Task.Delay(2500);
         }
         catch (Exception ex) { Log.Error("demo tour", ex); }
         finally
@@ -1248,6 +1256,7 @@ public partial class NotchWindow : Window, INotchShell
             Pill.IsHitTestVisible = true;
             _scripted = false;
             _recordingTour = false;
+            _tourCaption = "";
             RestoreTheme(); // re-applies settings, which also puts "hide from screen capture" back
             _tab = savedTab;
             Collapse();
@@ -1258,6 +1267,142 @@ public partial class NotchWindow : Window, INotchShell
             (a.AccentColor, a.BackgroundColor, a.GradientColor, a.GradientAngle, a.BackgroundType) = saved;
             SettingsStore.NotifyChanged();
         }
+    }
+
+    /// <summary>What the current part of the demo tour is about; drawn under the notch in recorded videos.</summary>
+    private string TourCaption
+    {
+        get => _tourCaption;
+        set { if (_tourCaption != value) { _tourCaption = value; _captionSince = DateTime.Now; } }
+    }
+    private string _tourCaption = "";
+    private DateTime _captionSince = DateTime.Now;
+
+    /// <summary>
+    /// Developer helper (NotchX.exe --record-tour &lt;folder&gt;): plays the demo tour and saves it as 1920×1080 JPEG frames
+    /// drawn from the notch itself (no wallpaper or other windows), with the tour's captions underneath, plus
+    /// frames.txt with each frame's time in milliseconds. A separate encoder turns them into an MP4.
+    /// </summary>
+    public async Task RecordDemoTourAsync(string folder)
+    {
+        try
+        {
+            Directory.CreateDirectory(folder);
+            foreach (var old in Directory.GetFiles(folder, "frame_*.jpg")) File.Delete(old);
+            await Task.Delay(5000); // let music, weather and devices load first
+
+            const int W = 1920, H = 1080;
+            const double scale = 1.7;  // the notch, large, hanging from the top edge
+            const int captionTop = 760;
+
+            // The backdrop is drawn once; each frame only renders the notch (software rendering is the slow part),
+            // then composes backdrop + notch + caption off the UI thread, so the tour's animations stay smooth.
+            var backdrop = new byte[W * H * 4];
+            {
+                var v = new DrawingVisual();
+                using (var dc = v.RenderOpen())
+                    dc.DrawRectangle(new LinearGradientBrush(Color.FromRgb(0x3A, 0x40, 0x58), Color.FromRgb(0x16, 0x19, 0x26), 90), null, new Rect(0, 0, W, H));
+                var b = new RenderTargetBitmap(W, H, 96, 96, PixelFormats.Pbgra32);
+                b.Render(v);
+                b.CopyPixels(backdrop, W * 4, 0);
+            }
+            var pillBrush = new VisualBrush(Pill) { Stretch = Stretch.Fill };
+            var typeface = new Typeface(new FontFamily("Segoe UI Variable Display"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
+            var captions = new Dictionary<string, (byte[] Pixels, int W, int H)>();
+            (byte[] Pixels, int W, int H) Caption(string text)
+            {
+                if (captions.TryGetValue(text, out var c)) return c;
+                var ft = new FormattedText(text, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                    typeface, 64, new SolidColorBrush(Color.FromRgb(0xF4, 0xF6, 0xFB)), 1.0);
+                int cw = (int)Math.Ceiling(ft.Width) + 4, ch = (int)Math.Ceiling(ft.Height) + 4;
+                var v = new DrawingVisual();
+                using (var dc = v.RenderOpen()) dc.DrawText(ft, new Point(2, 2));
+                var b = new RenderTargetBitmap(cw, ch, 96, 96, PixelFormats.Pbgra32);
+                b.Render(v);
+                var px = new byte[cw * ch * 4];
+                b.CopyPixels(px, cw * 4, 0);
+                return captions[text] = (px, cw, ch);
+            }
+
+            var times = new List<long>();
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var writes = new List<Task>();
+            var frame = 0;
+            var recording = true;
+            var pending = 0;
+
+            void Capture()
+            {
+                // Skip the tour's lead-in (it's only there for hand recording), and if saving falls behind,
+                // skip a frame rather than pile up memory (each composed frame is ~8 MB).
+                if (!recording || _tourCaption.Length == 0 || Volatile.Read(ref pending) > 24) return;
+                int pw = (int)Math.Round(Pill.ActualWidth * scale), ph = (int)Math.Round(Pill.ActualHeight * scale);
+                if (pw <= 0 || ph <= 0) return;
+                var v = new DrawingVisual();
+                using (var dc = v.RenderOpen()) dc.DrawRectangle(pillBrush, null, new Rect(0, 0, pw, ph));
+                var notch = new RenderTargetBitmap(pw, ph, 96, 96, PixelFormats.Pbgra32);
+                notch.Render(v);
+                notch.Freeze();
+                var caption = Caption(_tourCaption);
+                var fade = Math.Clamp((DateTime.Now - _captionSince).TotalSeconds / 0.45, 0, 1);
+                var path = System.IO.Path.Combine(folder, $"frame_{++frame:00000}.jpg");
+                times.Add(clock.ElapsedMilliseconds);
+                Interlocked.Increment(ref pending);
+                writes.Add(Task.Run(() =>
+                {
+                    try
+                    {
+                        var px = (byte[])backdrop.Clone();
+                        var np = new byte[pw * ph * 4];
+                        notch.CopyPixels(np, pw * 4, 0);
+                        Blend(px, np, pw, ph, (W - pw) / 2, 0, 1.0);
+                        Blend(px, caption.Pixels, caption.W, caption.H, (W - caption.W) / 2, captionTop + (int)((1 - fade) * 12), fade);
+                        var image = BitmapSource.Create(W, H, 96, 96, PixelFormats.Pbgra32, null, px, W * 4);
+                        var encoder = new JpegBitmapEncoder { QualityLevel = 92 };
+                        encoder.Frames.Add(BitmapFrame.Create(image));
+                        using var stream = File.Create(path);
+                        encoder.Save(stream);
+                    }
+                    finally { Interlocked.Decrement(ref pending); }
+                }));
+            }
+
+            // Premultiplied-alpha "over": dst = src·opacity + dst·(1 − srcAlpha·opacity).
+            static void Blend(byte[] dst, byte[] src, int sw, int sh, int x0, int y0, double opacity)
+            {
+                if (opacity <= 0) return;
+                int o = (int)(opacity * 256);
+                for (int y = 0; y < sh; y++)
+                {
+                    int dy = y0 + y;
+                    if (dy < 0 || dy >= H) continue;
+                    for (int x = 0; x < sw; x++)
+                    {
+                        int dx = x0 + x;
+                        if (dx < 0 || dx >= W) continue;
+                        int s = (y * sw + x) * 4, d = (dy * W + dx) * 4;
+                        int a = src[s + 3] * o >> 8;
+                        if (a == 0) continue;
+                        int inv = 255 - a;
+                        dst[d] = (byte)((src[s] * o >> 8) + dst[d] * inv / 255);
+                        dst[d + 1] = (byte)((src[s + 1] * o >> 8) + dst[d + 1] * inv / 255);
+                        dst[d + 2] = (byte)((src[s + 2] * o >> 8) + dst[d + 2] * inv / 255);
+                        dst[d + 3] = 255;
+                    }
+                }
+            }
+
+            var ticker = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(1000.0 / 30) };
+            ticker.Tick += (_, _) => Capture();
+            ticker.Start();
+            await PlayDemoTourAsync();
+            recording = false;
+            ticker.Stop();
+            await Task.WhenAll(writes);
+            File.WriteAllLines(System.IO.Path.Combine(folder, "frames.txt"), times.Select(t => t.ToString()));
+            Log.Info($"Demo tour recorded: {frame} frames over {clock.Elapsed.TotalSeconds:0.0}s to {folder}");
+        }
+        catch (Exception ex) { Log.Error("record demo tour", ex); }
     }
 
     /// <summary>Render an element at 2× over a slate backdrop (the notch hangs from the top edge, with a soft shadow).</summary>

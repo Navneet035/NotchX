@@ -70,6 +70,9 @@ public partial class App : Application
         if (shots >= 0 && shots + 1 < e.Args.Length) _ = window.SaveReadmeShotsAsync(e.Args[shots + 1]);
         // NotchX.exe --demo-tour plays the hands-free tour for recording a video (also in the command palette).
         if (e.Args.Contains("--demo-tour")) _ = window.PlayDemoTourAsync();
+        // NotchX.exe --record-tour <folder> plays the tour and saves it as video frames (see RecordDemoTourAsync).
+        var record = Array.IndexOf(e.Args, "--record-tour");
+        if (record >= 0 && record + 1 < e.Args.Length) _ = window.RecordDemoTourAsync(e.Args[record + 1]);
     }
 
     /// <summary>Start a fresh copy and quit this one.</summary>
