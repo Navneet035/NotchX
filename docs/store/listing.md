@@ -95,15 +95,14 @@ widgets
 Upload in this order, from `docs/store/screenshots/` (1920×1080):
 
 1. `01-home.png`
-2. `03-desktops.png`
-3. `05-themes.png`
-4. `04-documents.png`
-5. `02-music.png`: **see the note below before using it**
+2. `02-music.png`
+3. `03-desktops.png`
+4. `05-themes.png`
+5. `04-documents.png`
 
-> **Note on `02-music.png`:** it shows a real album cover and song lyrics. Microsoft can reject listings
-> that show other people's copyrighted artwork or lyrics. Skip it, or re-shoot it while a royalty-free track
-> is playing (for example from YouTube's Audio Library), using `NotchX.exe --readme-shots <folder>` and then
-> `packaging\store-screenshots.ps1`.
+`02-music.png` was shot while playing an original demo track ("Midnight Drive" by NotchX, with our own cover
+art), so no third-party album art or lyrics appear in the listing. Its source render is
+`docs/store/source/now-playing-demo.png`.
 
 Regenerate all of them with `packaging\store-screenshots.ps1`.
 

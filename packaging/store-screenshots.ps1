@@ -24,7 +24,7 @@ function Shot([string] $file, [string] $source, [string] $headline, [string] $li
     $bmp = New-Object System.Drawing.Bitmap $W, $H
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = 'HighQuality'; $g.InterpolationMode = 'HighQualityBicubic'; $g.TextRenderingHint = 'AntiAliasGridFit'
-    $img = [System.Drawing.Image]::FromFile((Join-Path $images $source))
+    $img = [System.Drawing.Image]::FromFile($(if (Test-Path (Join-Path $root $source)) { Join-Path $root $source } else { Join-Path $images $source }))
 
     if ($Window) {
         # A Settings window: headline on top, the window below with a soft shadow.
@@ -63,7 +63,8 @@ function Shot([string] $file, [string] $source, [string] $headline, [string] $li
 }
 
 Shot '01-home.png' 'home-v2.png' 'Everything you need, one hover away' 'Clock, weather, sound, brightness, Bluetooth and notes in a notch at the top of your screen.'
-Shot '02-music.png' 'now-playing-v2.png' 'Your music, right at the top' 'Album art, controls and synced lyrics for Spotify, YouTube Music and more.'
+# Played with an original demo track ("Midnight Drive" by NotchX), so no third-party album art or lyrics.
+Shot '02-music.png' 'docs\store\source\now-playing-demo.png' 'Your music, right at the top' 'Album art and controls for Spotify, YouTube Music and more, with synced lyrics when available.'
 Shot '03-desktops.png' 'desktops-v2.png' 'Every desktop at a glance' 'Jump to any window, or drag it onto another virtual desktop.'
 Shot '04-documents.png' 'documents-v2.png' 'Convert and edit documents' 'Word to PDF, PDF to Word and a PDF editor, all on your PC. Nothing is uploaded.'
 Shot '05-themes.png' 'settings-v2.png' 'Make it yours' 'Themes, colours, sizes, tabs and a Home page you arrange yourself.' -Window
