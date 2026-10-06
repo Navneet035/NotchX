@@ -187,7 +187,7 @@ cd NotchX
 
 ## Privacy
 
-NotchX runs entirely on your PC. Clipboard history, screen time, notes and documents never leave it. The only features that go online are weather (Open-Meteo), synced lyrics (LRCLIB) and, if you add a token, your Copilot usage.
+NotchX runs entirely on your PC. Clipboard history, screen time, notes and documents never leave it. The only features that go online are weather and city search (Open-Meteo), synced lyrics (LRCLIB), calendar feeds you add, translation when you use it and, if you add a token, your Copilot usage. There are no accounts, ads or analytics. Full details: [privacy policy](docs/PRIVACY.md).
 
 ## Roadmap
 
