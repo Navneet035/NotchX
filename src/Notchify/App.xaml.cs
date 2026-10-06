@@ -68,6 +68,8 @@ public partial class App : Application
         // Developer helper: NotchX.exe --readme-shots <folder> saves fresh screenshots for the README.
         var shots = Array.IndexOf(e.Args, "--readme-shots");
         if (shots >= 0 && shots + 1 < e.Args.Length) _ = window.SaveReadmeShotsAsync(e.Args[shots + 1]);
+        // NotchX.exe --demo-tour plays the hands-free tour for recording a video (also in the command palette).
+        if (e.Args.Contains("--demo-tour")) _ = window.PlayDemoTourAsync();
     }
 
     /// <summary>Start a fresh copy and quit this one.</summary>

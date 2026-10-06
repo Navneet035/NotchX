@@ -64,7 +64,7 @@ public partial class NotchWindow : Window, INotchShell
         Header.MouseWheel += Header_MouseWheel;
         Header.SizeChanged += Header_SizeChanged;
         PreviewKeyDown += OnPreviewKeyDown;
-        Deactivated += (_, _) => { if (_state == NotchState.Expanded && !_dragging && !_holdForShots && !CursorOverPill() && PinToggle.IsChecked != true) Collapse(); };
+        Deactivated += (_, _) => { if (_state == NotchState.Expanded && !_dragging && !_scripted && !CursorOverPill() && PinToggle.IsChecked != true) Collapse(); };
         // Any drag that starts inside the notch (windows between desktops, shelf files, launcher tiles, Home cards…)
         // keeps it open until the drop: during a drag Windows stops reporting that the mouse is over us.
         AddHandler(DragDrop.QueryContinueDragEvent, new QueryContinueDragEventHandler(OnQueryContinueDrag), true);
@@ -218,9 +218,10 @@ public partial class NotchWindow : Window, INotchShell
 
         if (_hwnd != IntPtr.Zero)
         {
-            var affinity = s.Behavior.HideFromScreenCapture ? Native.WDA_EXCLUDEFROMCAPTURE : Native.WDA_NONE;
-            Native.SetWindowDisplayAffinity(_hwnd, affinity);
-            _glass.SetExcludedFromCapture(s.Behavior.HideFromScreenCapture);
+            // The demo tour must stay visible to the screen recorder even when its theme changes re-apply settings.
+            var hide = s.Behavior.HideFromScreenCapture && !_recordingTour;
+            Native.SetWindowDisplayAffinity(_hwnd, hide ? Native.WDA_EXCLUDEFROMCAPTURE : Native.WDA_NONE);
+            _glass.SetExcludedFromCapture(hide);
         }
         var tabLook = a.TabLabels + "|" + a.TabOverflow;
         if (tabLook != _tabLabels)
@@ -669,7 +670,7 @@ public partial class NotchWindow : Window, INotchShell
     {
         if (_state != NotchState.Expanded) { _leaveWatch.Stop(); return; }
         var b = SettingsStore.Current.Behavior;
-        var holding = !b.AutoCollapse || PinToggle.IsChecked == true || _holdForShots || LayoutEditor.IsEditing || _dragging
+        var holding = !b.AutoCollapse || PinToggle.IsChecked == true || _scripted || LayoutEditor.IsEditing || _dragging
             || Mouse.Captured != null || (IsActive && Keyboard.FocusedElement is TextBox);
         if (holding || CursorOverPill())
         {
@@ -685,7 +686,7 @@ public partial class NotchWindow : Window, INotchShell
 
     private void TryAutoCollapse()
     {
-        if (_dragging || _holdForShots || CursorOverPill() || _state != NotchState.Expanded) return;
+        if (_dragging || _scripted || CursorOverPill() || _state != NotchState.Expanded) return;
         // Don't yank the panel away while the user is typing in it or a popup (combo box) is open.
         if (IsActive && Keyboard.FocusedElement is TextBox) return;
         if (Mouse.Captured != null) return;
@@ -1152,7 +1153,7 @@ public partial class NotchWindow : Window, INotchShell
             await Task.Delay(6000); // let music, weather and devices load first
             // Hold the notch open without pressing the pin, so the pin doesn't show as "on" in the pictures,
             // and ignore the real mouse so whatever it rests on doesn't show a hover highlight.
-            _holdForShots = true;
+            _scripted = true;
             Header.IsHitTestVisible = false;
             Mouse.Synchronize();
             foreach (var (file, tab) in new[] { ("home", "home"), ("now-playing", "music"), ("desktops", "desktops"), ("launcher", "launcher"), ("documents", "documents") })
@@ -1162,7 +1163,7 @@ public partial class NotchWindow : Window, INotchShell
                 await Task.Delay(1400);
                 SaveShot(System.IO.Path.Combine(folder, file + ".png"), Pill);
             }
-            _holdForShots = false;
+            _scripted = false;
             Header.IsHitTestVisible = true;
             Collapse();
             await Task.Delay(1400);
@@ -1181,10 +1182,83 @@ public partial class NotchWindow : Window, INotchShell
             Log.Info("README screenshots saved to " + folder);
         }
         catch (Exception ex) { Log.Error("README screenshots", ex); }
-        finally { _holdForShots = false; Header.IsHitTestVisible = true; }
+        finally { _scripted = false; Header.IsHitTestVisible = true; }
     }
 
-    private bool _holdForShots;
+    /// <summary>True while a screenshot run or the demo tour drives the notch: it stays open and ignores the mouse.</summary>
+    private bool _scripted;
+
+    /// <summary>True during the demo tour: screen recorders may see the notch even if it's normally hidden from capture.</summary>
+    private bool _recordingTour;
+
+    // ---------------- Demo tour ----------------
+
+    /// <summary>
+    /// A ~40-second, hands-free tour for recording a video (palette › "Play demo tour", or NotchX.exe --demo-tour):
+    /// opens on Home, steps through Music, Desktops, Launcher, Shelf and Docs, cycles a few themes, shows an island,
+    /// then closes. It ignores the mouse, lets screen recorders see the notch for its duration, and puts the theme,
+    /// tab and capture setting back exactly as they were.
+    /// </summary>
+    public async Task PlayDemoTourAsync()
+    {
+        if (_scripted) return;
+        _scripted = true;
+        var a = SettingsStore.Current.Appearance;
+        var saved = (a.AccentColor, a.BackgroundColor, a.GradientColor, a.GradientAngle, a.BackgroundType);
+        var savedTab = _tab;
+        try
+        {
+            // Visible to the screen recorder for the tour, whatever the "hide from screen capture" setting says.
+            _recordingTour = true;
+            ApplySettings();
+            Pill.IsHitTestVisible = false; // a resting mouse can't open, close or highlight anything
+            Collapse();
+            await Task.Delay(3000);        // time for the palette to close and the recording to settle
+
+            async Task Show(string tab, int ms)
+            {
+                if (Notch.Modules.Tabs.Any(t => t.Id == tab)) { OpenTab(tab); await Task.Delay(ms); }
+            }
+            await Task.Delay(1500);        // the closed pill, with what's playing
+            await Show("home", 4500);
+            await Show("music", 5000);
+            await Show("desktops", 4000);
+            await Show("launcher", 3000);
+            await Show("shelf", 3000);
+            await Show("documents", 3000);
+
+            // Themes, on Home so the cards show them off.
+            await Show("home", 800);
+            foreach (var name in new[] { "Midnight", "Aurora", "Ember", "Lime", "Rose" })
+            {
+                if (ThemePresets.All.FirstOrDefault(t => t.Name == name) is { } theme) ThemePresets.Apply(theme);
+                await Task.Delay(1300);
+            }
+            RestoreTheme();
+
+            await Task.Delay(800);
+            Collapse();
+            await Task.Delay(1500);
+            Notch.Hub.Notify(Glyphs.Stopwatch, "Focus session complete", "Time for a 5-minute break", Ui.Green, IslandPriority.High, 3.5);
+            await Task.Delay(4500);
+        }
+        catch (Exception ex) { Log.Error("demo tour", ex); }
+        finally
+        {
+            Pill.IsHitTestVisible = true;
+            _scripted = false;
+            _recordingTour = false;
+            RestoreTheme(); // re-applies settings, which also puts "hide from screen capture" back
+            _tab = savedTab;
+            Collapse();
+        }
+
+        void RestoreTheme()
+        {
+            (a.AccentColor, a.BackgroundColor, a.GradientColor, a.GradientAngle, a.BackgroundType) = saved;
+            SettingsStore.NotifyChanged();
+        }
+    }
 
     /// <summary>Render an element at 2× over a slate backdrop (the notch hangs from the top edge, with a soft shadow).</summary>
     private static void SaveShot(string path, FrameworkElement element, Brush? background = null, double pad = 44)
