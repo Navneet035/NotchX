@@ -7,3 +7,4 @@ publish/
 .idea/
 *.DotSettings.user
 .DS_Store
+msix-out/

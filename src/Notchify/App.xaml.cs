@@ -89,6 +89,11 @@ public partial class App : Application
 
     private static void ApplyStartup()
     {
+        if (PackageInfo.IsPackaged)
+        {
+            _ = ApplyPackagedStartupAsync();
+            return;
+        }
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
@@ -101,6 +106,40 @@ public partial class App : Application
                 key.DeleteValue(AppInfo.Name);
         }
         catch (Exception ex) { Log.Error("startup registration", ex); }
+    }
+
+    /// <summary>
+    /// Store (MSIX) builds can't use the Run key; Windows starts them through the StartupTask in the manifest.
+    /// If the user switched NotchX off in Task Manager › Startup apps, Windows won't let us turn it back on —
+    /// the setting is put back in sync and they're told where to change it.
+    /// </summary>
+    private static async Task ApplyPackagedStartupAsync()
+    {
+        try
+        {
+            var task = await global::Windows.ApplicationModel.StartupTask.GetAsync(PackageInfo.StartupTaskId);
+            var behavior = SettingsStore.Current.Behavior;
+            if (behavior.StartWithWindows)
+            {
+                if (task.State is global::Windows.ApplicationModel.StartupTaskState.Disabled)
+                    await task.RequestEnableAsync();
+                if (task.State is global::Windows.ApplicationModel.StartupTaskState.DisabledByUser or global::Windows.ApplicationModel.StartupTaskState.DisabledByPolicy)
+                {
+                    Current.Dispatcher.Invoke(() =>
+                    {
+                        behavior.StartWithWindows = false;
+                        SettingsStore.NotifyChanged();
+                        Notch.Hub.Notify(Glyphs.Info, "Start with Windows is off in Windows",
+                            "Turn NotchX on in Settings › Apps › Startup.", Ui.Orange);
+                    });
+                }
+            }
+            else if (task.State is global::Windows.ApplicationModel.StartupTaskState.Enabled)
+            {
+                task.Disable();
+            }
+        }
+        catch (Exception ex) { Log.Error("startup task", ex); }
     }
 
     // ---------------- Tray icon (Windows' equivalent of the menu bar extra) ----------------

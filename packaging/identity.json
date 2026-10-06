@@ -1,0 +1,6 @@
+{
+  "_comment": "Copy these three values from Partner Center > your app > Product management > Product identity. Until then the placeholders produce a package that builds but can't be uploaded.",
+  "IdentityName": "NotchX.Placeholder",
+  "Publisher": "CN=00000000-0000-0000-0000-000000000000",
+  "PublisherDisplayName": "Navneet"
+}

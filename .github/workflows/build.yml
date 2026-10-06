@@ -28,6 +28,15 @@ jobs:
         with:
           name: NotchX
           path: publish/
+      # Microsoft Store package (unsigned: the Store signs it on upload). Kept as a build artifact,
+      # not a release download, because an unsigned .msix can't be installed outside the Store.
+      - name: Store package (MSIX)
+        shell: powershell
+        run: ./packaging/build-msix.ps1
+      - uses: actions/upload-artifact@v5
+        with:
+          name: NotchX-Store
+          path: msix-out/*.msixbundle
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
