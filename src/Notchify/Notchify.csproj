@@ -14,7 +14,7 @@
     <!-- The app is called NotchX; the code namespaces keep their original "Notchify" name. -->
     <AssemblyName>NotchX</AssemblyName>
     <RootNamespace>Notchify</RootNamespace>
-    <Version>0.3.0</Version>
+    <Version>0.3.1</Version>
     <Product>NotchX</Product>
     <AssemblyTitle>NotchX</AssemblyTitle>
     <Authors>Navneet</Authors>
