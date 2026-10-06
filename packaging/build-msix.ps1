@@ -87,6 +87,7 @@ foreach ($a in $Arch) {
 
     $manifest = (Get-Content (Join-Path $PSScriptRoot 'AppxManifest.xml') -Raw).
         Replace('$IDENTITY_NAME$', $identity.IdentityName).
+        Replace('$STORE_NAME$', [Security.SecurityElement]::Escape($identity.StoreName)).
         Replace('$PUBLISHER_DISPLAY_NAME$', [Security.SecurityElement]::Escape($identity.PublisherDisplayName)).
         Replace('$PUBLISHER$', [Security.SecurityElement]::Escape($identity.Publisher)).
         Replace('$VERSION$', $packageVersion).

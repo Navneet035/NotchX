@@ -10,6 +10,7 @@ In Partner Center, open your app (after reserving the name **NotchX**) › **Pro
 
 | Partner Center shows | `identity.json` field |
 |---|---|
+| The reserved app name (e.g. "NotchX - Dynamic Notch") | `StoreName`: copy it exactly. Windows itself still shows the short name "NotchX" |
 | Package/Identity/Name | `IdentityName` |
 | Package/Identity/Publisher | `Publisher` (starts with `CN=`) |
 | Package/Properties/PublisherDisplayName | `PublisherDisplayName` |

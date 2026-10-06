@@ -18,7 +18,8 @@
     ProcessorArchitecture="$ARCH$" />
 
   <Properties>
-    <DisplayName>NotchX</DisplayName>
+    <!-- Must match the name reserved in Partner Center exactly. Start menu / taskbar use the short name below. -->
+    <DisplayName>$STORE_NAME$</DisplayName>
     <PublisherDisplayName>$PUBLISHER_DISPLAY_NAME$</PublisherDisplayName>
     <Logo>Images\StoreLogo.png</Logo>
     <Description>A notch-style hub at the top of your screen for music, files, clipboard, desktops and more.</Description>

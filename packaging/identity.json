@@ -1,6 +1,7 @@
 {
-  "_comment": "Copy these three values from Partner Center > your app > Product management > Product identity. Until then the placeholders produce a package that builds but can't be uploaded.",
-  "IdentityName": "NotchX.Placeholder",
-  "Publisher": "CN=00000000-0000-0000-0000-000000000000",
-  "PublisherDisplayName": "Navneet"
+  "_comment": "From Partner Center > NotchX - Dynamic Notch > Product management > Product identity (Store ID 9N2LWTDSX986). StoreName must match the reserved name exactly.",
+  "StoreName": "NotchX - Dynamic Notch",
+  "IdentityName": "NavneetKaur.NotchX-DynamicNotch",
+  "Publisher": "CN=109DDA7E-F92F-4A83-A61F-08C5F7519061",
+  "PublisherDisplayName": "Navneet Kaur"
 }
