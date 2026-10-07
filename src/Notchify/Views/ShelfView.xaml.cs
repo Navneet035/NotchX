@@ -114,6 +114,30 @@ public partial class ShelfView : UserControl
     private void Capture_Click(object sender, RoutedEventArgs e) => ToolsModule.ScreenCapture();
     private void Clear_Click(object sender, RoutedEventArgs e) => Notch.Shelf.Clear();
 
+    private ShortcutPicker? _picker;
+
+    /// <summary>Type an app, a folder (Downloads…), a drive or a path. Folders and files go on as they are; apps as a shortcut.</summary>
+    private void Add_Click(object sender, RoutedEventArgs e)
+    {
+        if (_picker == null)
+        {
+            _picker = new ShortcutPicker();
+            _picker.Picked += t =>
+            {
+                if (!t.IsApp) { Notch.Shelf.Add(new[] { t.Path }); return; }
+                // The shelf holds files, so an app goes on as a shortcut file (with the app's own icon).
+                var link = ShortcutCatalog.CreateShortcutFile(t, Path.Combine(Paths.Shelf, "Shortcuts"));
+                if (link == null) return;
+                Notch.Shelf.Add(new[] { link });
+                if (Notch.Shelf.Items.FirstOrDefault(i => string.Equals(i.Path, link, StringComparison.OrdinalIgnoreCase)) is { } item &&
+                    ShortcutCatalog.SaveIcon(t) is { } icon)
+                    Notch.Shelf.SetIcon(item, icon);
+            };
+            PickerHost.Content = _picker;
+        }
+        _picker.Show();
+    }
+
     // ----- context menu -----
 
     private static ShelfItem? Item(object sender) => (sender as FrameworkElement)?.DataContext as ShelfItem;

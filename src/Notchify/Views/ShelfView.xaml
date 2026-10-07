@@ -8,6 +8,9 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+            <Button Style="{StaticResource ChipButton}" Click="Add_Click" Margin="0,0,6,0" ToolTip="Add an app, a folder like Downloads, a drive or a file — just type its name">
+                <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="12" Margin="0,0,6,0" /><TextBlock Text="Add" /></StackPanel>
+            </Button>
             <Button Style="{StaticResource ChipButton}" Click="Zip_Click" Margin="0,0,6,0" ToolTip="Compress the selection (or everything) into a .zip">
                 <StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource Icon}" Text="&#xE7B8;" FontSize="12" Margin="0,0,6,0" /><TextBlock Text="Zip" /></StackPanel>
             </Button>
@@ -73,5 +76,8 @@
             <TextBlock Style="{StaticResource Body}" Text="Drop files here" HorizontalAlignment="Center" Margin="0,8,0,0" />
             <TextBlock Style="{StaticResource Caption}" Text="They stay until you drag them out — even across restarts" HorizontalAlignment="Center" />
         </StackPanel>
+
+        <!-- "Type to add" panel (filled in code). -->
+        <ContentControl x:Name="PickerHost" Grid.Row="1" Focusable="False" />
     </Grid>
 </UserControl>

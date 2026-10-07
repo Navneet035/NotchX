@@ -49,12 +49,23 @@ public sealed class LauncherModule : NotchModule
         catch (Exception ex) { Notch.Hub.Notify(Glyphs.Warning, $"Couldn't open {app.Name}", ex.Message, Ui.Red); }
     }
 
-    public void Add(string path)
+    public void Add(string path, string? name = null, string? icon = null)
     {
         if (Apps.Any(a => a.Path.Equals(path, StringComparison.OrdinalIgnoreCase))) return;
-        Apps.Add(new LauncherApp { Name = System.IO.Path.GetFileNameWithoutExtension(path), Path = path });
+        if (name == null)
+        {
+            var trimmed = path.TrimEnd('\\', '/');
+            // A folder keeps its whole name ("Project.v2"); a drive root has none, so use the path ("D:\").
+            name = Directory.Exists(path) ? (System.IO.Path.GetFileName(trimmed) is { Length: > 0 } n ? n : path)
+                : System.IO.Path.GetFileNameWithoutExtension(path);
+        }
+        Apps.Add(new LauncherApp { Name = name, Path = path, CustomIcon = icon });
         Save();
     }
+
+    /// <summary>From the "type to add" box: apps (Store apps too) get their icon saved, since there's no file to read it from.</summary>
+    public void Add(Services.ShortcutTarget t) =>
+        Add(t.Path, t.Name, t.IsApp ? Services.ShortcutCatalog.SaveIcon(t) : null);
 
     /// <summary>Start-menu shortcuts for the picker (per-user + all users).</summary>
     public static List<(string Name, string Path)> StartMenuApps()
@@ -75,9 +86,9 @@ public sealed class LauncherModule : NotchModule
     public override FrameworkElement CreateView()
     {
         var root = new Grid { AllowDrop = true };
-        var picker = new Border { Visibility = Visibility.Collapsed, Padding = new Thickness(10), CornerRadius = new CornerRadius(12) };
+        var picker = new Views.ShortcutPicker();
         var tiles = new WrapPanel();
-        var empty = Text("Pin apps with + or drop shortcuts here", "Caption");
+        var empty = Text("Pin apps and folders with +, or drop shortcuts here", "Caption");
         empty.HorizontalAlignment = HorizontalAlignment.Center;
         empty.VerticalAlignment = VerticalAlignment.Center;
 
@@ -135,53 +146,13 @@ public sealed class LauncherModule : NotchModule
                 };
                 tiles.Children.Add(tile);
             }
-            var add = new Button { Style = S("ChipButton"), Width = 82, Height = 78, Content = Icon(Glyphs.Add, 20), ToolTip = "Add an app" };
-            add.Click += (_, _) => picker.Visibility = Visibility.Visible;
+            var add = new Button { Style = S("ChipButton"), Width = 82, Height = 78, Content = Icon(Glyphs.Add, 20), ToolTip = "Add an app, folder or file" };
+            add.Click += (_, _) => picker.Show();
             tiles.Children.Add(add);
         }
 
-        // Picker overlay
-        var search = new TextBox { Tag = "Search installed apps…" };
-        var results = new ListBox { Margin = new Thickness(0, 8, 0, 0), DisplayMemberPath = "Name" };
-        var all = new List<(string Name, string Path)>();
-        var close = IconButton(Glyphs.Close, "Close", (_, _) => picker.Visibility = Visibility.Collapsed);
-        var browse = Chip("Browse…", (_, _) =>
-        {
-            var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Apps|*.exe;*.lnk;*.bat;*.cmd;*.url|All files|*.*" };
-            if (dlg.ShowDialog() == true) { Add(dlg.FileName); Rebuild(); picker.Visibility = Visibility.Collapsed; }
-        });
-        var top = new DockPanel();
-        DockPanel.SetDock(close, Dock.Right);
-        DockPanel.SetDock(browse, Dock.Right);
-        top.Children.Add(close);
-        top.Children.Add(browse);
-        top.Children.Add(search);
-        var pickerPanel = new DockPanel();
-        DockPanel.SetDock(top, Dock.Top);
-        pickerPanel.Children.Add(top);
-        pickerPanel.Children.Add(results);
-        picker.Child = pickerPanel;
-        picker.SetResourceReference(Border.BackgroundProperty, "PanelBrush");
-        picker.IsVisibleChanged += (_, _) =>
-        {
-            if (!picker.IsVisible) return;
-            if (all.Count == 0) all = StartMenuApps();
-            results.ItemsSource = all.Select(x => new { x.Name, x.Path }).ToList();
-            search.Focus();
-        };
-        search.TextChanged += (_, _) =>
-            results.ItemsSource = all.Where(x => x.Name.Contains(search.Text, StringComparison.OrdinalIgnoreCase)).Select(x => new { x.Name, x.Path }).ToList();
-        results.MouseDoubleClick += (_, _) => Pick();
-        results.KeyDown += (_, e) => { if (e.Key == Key.Enter) Pick(); };
-        search.KeyDown += (_, e) => { if (e.Key == Key.Enter) { results.SelectedIndex = 0; Pick(); } };
-        void Pick()
-        {
-            if (results.SelectedItem == null) return;
-            var path = (string)results.SelectedItem.GetType().GetProperty("Path")!.GetValue(results.SelectedItem)!;
-            Add(path);
-            Rebuild();
-            picker.Visibility = Visibility.Collapsed;
-        }
+        // "Type to add": apps (Store apps too), folders like Downloads, drives, or a typed path.
+        picker.Picked += t => { Add(t); Rebuild(); };
 
         root.Drop += (_, e) =>
         {
