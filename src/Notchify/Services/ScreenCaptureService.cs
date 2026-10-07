@@ -22,6 +22,13 @@ public static class ScreenCaptureService
 {
     private static readonly List<CaptureOverlay> Overlays = new();
     private static bool _active;
+    private static DateTime _endedAt;
+
+    /// <summary>
+    /// True while the capture screen is up and for a few seconds after. Windows takes the full-screen overlay
+    /// for a full-screen app and switches on automatic Do Not Disturb, which shouldn't be announced.
+    /// </summary>
+    public static bool IsCapturing => _active || DateTime.Now - _endedAt < TimeSpan.FromSeconds(8);
 
     public static void Start()
     {
@@ -63,6 +70,7 @@ public static class ScreenCaptureService
         {
             Log.Error("screen capture", ex);
             _active = false;
+            _endedAt = DateTime.Now;
             return;
         }
         finally { RestoreCapture(hidden); }
@@ -107,6 +115,7 @@ public static class ScreenCaptureService
         foreach (var o in Overlays.ToList()) o.Close();
         Overlays.Clear();
         _active = false;
+        _endedAt = DateTime.Now;
         if (shot == null) return;
 
         var s = SettingsStore.Current.Capture;

@@ -293,6 +293,8 @@ public sealed class FocusMonitor
     {
         var state = Query();
         if (state < 0 || state == _last) return;
+        // Our own capture screen trips Windows' "full-screen app" Do Not Disturb; skip it until it's over.
+        if (!initial && ScreenCaptureService.IsCapturing) return;
         _last = state;
         Notch.Hub.QuietMode = state > 0;
         if (state > 0)

@@ -12,7 +12,7 @@ public partial class App : Application
     private Mutex? _singleInstance;
     private WinForms.NotifyIcon? _tray;
 
-    protected override async void OnStartup(StartupEventArgs e)
+    protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
@@ -55,7 +55,9 @@ public partial class App : Application
         Notch.Brightness.Start();
         Notch.ScreenTime.Start();
         Notch.Spaces.Start();
-        await Notch.Media.StartAsync();
+        // Not awaited: right after boot Windows' media service can take minutes to answer,
+        // and the launcher, tray and hotkeys shouldn't wait for it.
+        _ = Notch.Media.StartAsync();
 
         Notch.Modules.StartEnabled();
         RegisterHotkeys();

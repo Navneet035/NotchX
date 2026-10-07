@@ -26,6 +26,8 @@ public sealed class ClipItem : ObservableObject
     public string? SourceApp { get; set; }
     public bool Pinned { get => _pinned; set { if (Set(ref _pinned, value)) Raise(nameof(PinGlyph)); } }
     public string? OcrText { get => _ocrText; set => Set(ref _ocrText, value); }
+    /// <summary>Fingerprint of the pixels, so the same picture copied again isn't stored twice.</summary>
+    public string? ImageHash { get; set; }
 
     [JsonIgnore] public string PinGlyph => _pinned ? Glyphs.Unpin : Glyphs.Pin;
 
@@ -97,7 +99,8 @@ public sealed class ClipItem : ObservableObject
 public sealed class ClipboardService
 {
     private const string StoreName = "clipboard";
-    private bool _ignoreNext;
+    // Windows can report one write several times (images especially), so our own writes are ignored for a moment.
+    private DateTime _ignoreUntil;
     private DateTime _lastCapture;
 
     public ObservableCollection<ClipItem> Items { get; } = new();
@@ -118,7 +121,7 @@ public sealed class ClipboardService
     /// <summary>Called by the notch window on WM_CLIPBOARDUPDATE.</summary>
     public void OnClipboardChanged()
     {
-        if (_ignoreNext) { _ignoreNext = false; return; }
+        if (DateTime.Now < _ignoreUntil) return;
         var s = SettingsStore.Current.Clipboard;
         if (!s.Enabled) return;
         // Debounce apps that set the clipboard several times in a row.
@@ -162,9 +165,17 @@ public sealed class ClipboardService
             {
                 var img = Clipboard.GetImage();
                 if (img == null) return;
+                var hash = Fingerprint(img);
+                if (Items.FirstOrDefault(i => i.Kind == ClipKind.Image && i.ImageHash == hash) is { } same)
+                {
+                    Items.Move(Items.IndexOf(same), 0);
+                    same.Created = DateTime.Now;
+                    Save();
+                    return;
+                }
                 var path = Path.Combine(Paths.Clips, $"{DateTime.Now:yyyyMMdd-HHmmss-fff}.png");
                 SavePng(img, path);
-                item = new ClipItem { Kind = ClipKind.Image, ImagePath = path };
+                item = new ClipItem { Kind = ClipKind.Image, ImagePath = path, ImageHash = hash };
                 if (NextImageToShelf)
                 {
                     NextImageToShelf = false;
@@ -240,7 +251,7 @@ public sealed class ClipboardService
     /// <summary>Put an item back on the clipboard without re-recording it.</summary>
     public void Copy(ClipItem item)
     {
-        _ignoreNext = true;
+        IgnoreOwnWrite();
         try
         {
             switch (item.Kind)
@@ -258,13 +269,26 @@ public sealed class ClipboardService
             }
             Items.Move(Items.IndexOf(item), 0);
         }
-        catch (Exception ex) { _ignoreNext = false; Log.Error("clipboard write", ex); }
+        catch (Exception ex) { _ignoreUntil = default; Log.Error("clipboard write", ex); }
     }
 
     public void SetTextSilently(string text)
     {
-        _ignoreNext = true;
-        try { Clipboard.SetText(text); } catch { _ignoreNext = false; }
+        IgnoreOwnWrite();
+        try { Clipboard.SetText(text); } catch { _ignoreUntil = default; }
+    }
+
+    private void IgnoreOwnWrite() => _ignoreUntil = DateTime.Now.AddMilliseconds(700);
+
+    /// <summary>Hash of the colour pixels (alpha ignored — it doesn't always survive a round trip through the clipboard).</summary>
+    private static string Fingerprint(BitmapSource img)
+    {
+        var bgr = new FormatConvertedBitmap(img, PixelFormats.Bgr32, null, 0);
+        var stride = bgr.PixelWidth * 4;
+        var pixels = new byte[stride * bgr.PixelHeight];
+        bgr.CopyPixels(pixels, stride, 0);
+        for (var i = 3; i < pixels.Length; i += 4) pixels[i] = 0;
+        return $"{bgr.PixelWidth}x{bgr.PixelHeight}:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(pixels));
     }
 
     /// <summary>Copy then paste into the app that was focused before the notch opened.</summary>

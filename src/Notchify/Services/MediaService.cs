@@ -87,7 +87,12 @@ public sealed class MediaService : ObservableObject
     {
         try
         {
-            _manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+            // At logon the request can hang until the media service is up; give up on a stuck one and ask again.
+            for (var attempt = 1; _manager == null; attempt++)
+            {
+                try { _manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15)); }
+                catch (TimeoutException) when (attempt < 20) { Log.Info($"Media session manager not ready (try {attempt}), retrying"); }
+            }
             _manager.CurrentSessionChanged += (_, _) => Ui.Post(() => _ = AttachAsync(_manager.GetCurrentSession()));
             _manager.SessionsChanged += (_, _) => Ui.Post(() => _ = AttachAsync(_manager.GetCurrentSession()));
             await AttachAsync(_manager.GetCurrentSession());
