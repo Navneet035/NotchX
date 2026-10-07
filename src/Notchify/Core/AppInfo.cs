@@ -3,7 +3,7 @@ namespace Notchify.Core;
 public static class AppInfo
 {
     public const string Name = "NotchX";
-    public const string Version = "0.3.1";
+    public const string Version = "0.4.0";
     public const string Developer = "Navneet";
 
     /// <summary>Set this to your fork's URL; it's used for the docs links and the HTTP User-Agent.</summary>
