@@ -1,6 +1,6 @@
 # NotchX privacy policy
 
-_Last updated: 5 October 2026_
+_Last updated: 6 October 2026_
 
 NotchX is a desktop app for Windows that shows a notch-style panel at the top of your screen. It's built and
 maintained by Navneet Kaur. This policy explains what NotchX does with your information. The short version:
@@ -41,6 +41,10 @@ To work, NotchX reads some things locally. None of it is stored beyond what's li
 - **Bluetooth devices and battery levels**, for the Bluetooth and battery cards.
 - **AI coding tool logs:** if you use Claude Code or Codex, NotchX reads their usage logs on your PC to show
   token counts and limits.
+- **Other apps' notifications** (Microsoft Store version only, and only after you allow it when Windows
+  asks): NotchX reads the notifications in Windows' notification centre to show them in the notch. They're
+  kept in memory while shown and never saved or sent anywhere. You can hide message text, mute apps, or turn
+  the feature off in Settings, and withdraw access in Windows Settings › Privacy & security › Notifications.
 - **Files you give it:** files you drop on the shelf or open in the Documents tab are converted or edited on
   your PC, with Microsoft Word or LibreOffice when they're installed.
 

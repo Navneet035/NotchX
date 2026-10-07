@@ -27,6 +27,7 @@ YOUR DESKTOPS AT A GLANCE
 See every virtual desktop and the windows open on it. Click a window to jump to it, or drag windows onto another desktop to move them.
 
 GET THINGS DONE
+- Notifications from WhatsApp, Teams, Outlook and other apps slide out of the notch, with an unread count
 - Clipboard history with search, including text inside screenshots
 - A file shelf: drop files on the notch, drag them out later
 - Convert Word to PDF and PDF to Word, and edit PDFs
@@ -46,19 +47,18 @@ NotchX is free and open source.
 ### What's new in this version
 
 ```
-- Themes: seven one-click looks, and a highlight colour for the selected tab
-- Desktops tab: see each virtual desktop's windows and drag them between desktops
-- World clocks: search for cities as you type and see their time and weather
-- Named tabs, with extra tabs on a second row or in a More menu
-- Clock options: 12 or 24 hour, seconds and date style
-- Custom icons for Launcher and Shelf items
-- Smoother, more polished look throughout
+- Notifications: other apps' notifications slide out of the notch, with an unread count and a Notifications tab
+- Mute apps or hide message text for privacy
+- Starts reliably with Windows, even when the PC is slow to start up
+- Copying a screenshot from clipboard history no longer adds a duplicate
+- Screen capture no longer triggers a Do Not Disturb pop-up
 ```
 
 ### Product features (one per line; Partner Center allows up to 20)
 
 ```
 Music controls with album art and synced lyrics
+Notifications from your apps, right in the notch
 A Home page of 22 cards you can arrange and resize
 See and move windows between virtual desktops
 Clipboard history with search inside screenshots
