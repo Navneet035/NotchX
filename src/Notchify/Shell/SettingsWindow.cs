@@ -694,7 +694,27 @@ public sealed class SettingsWindow : Window
     {
         var h = S.Huds;
         void Restart() { Notch.Modules.Restart("huds"); Notch.Modules.Restart("filealerts"); }
+        var n = S.Notifications;
+        var mirror = Notch.Modules.Get("notifications") as NotificationsModule;
+        var access = mirror?.Access ?? NotificationAccess.Off;
+        var accessButtons = new List<UIElement>();
+        if (access == NotificationAccess.NotPackaged)
+            accessButtons.Add(Chip("Get NotchX from the Store", (_, _) => Ui.OpenUrl("ms-windows-store://pdp/?productid=9N2LWTDSX986"), Glyphs.Download, accent: true));
+        if (access is NotificationAccess.Denied or NotificationAccess.Error)
+            accessButtons.Add(Chip("Open Windows notification access", (_, _) => Ui.OpenUrl("ms-settings:privacy-notifications"), Glyphs.Settings, accent: true));
         return Page(
+            Header("Other apps' notifications", "Messages from WhatsApp, Teams, Outlook and others slide out of the notch. Turn the feature on or off in Features."),
+            Note(NotificationsModule.AccessText(access)),
+            Buttons(accessButtons.ToArray()),
+            Toggle("Show new notifications in the notch", () => n.ShowIsland, v => n.ShowIsland = v),
+            Toggle("Show the message text", () => n.ShowText, v => n.ShowText = v, tip: "Off: only the app name and \"New notification\""),
+            Toggle("Unread count on the closed notch", () => n.UnreadOnPill, v => n.UnreadOnPill = v),
+            Toggle("Stay quiet during Do Not Disturb", () => n.RespectDoNotDisturb, v => n.RespectDoNotDisturb = v),
+            Slide("Show for", 2, 20, () => n.Seconds, v => n.Seconds = v, "0 s"),
+            Field("Muted apps", () => string.Join(", ", n.MutedApps), v => n.MutedApps = v.Split(',').Select(x => x.Trim()).Where(x => x.Length > 0).ToList(),
+                "Comma-separated, as Windows names them. Or right-click a notification › Mute."),
+            Note("Windows still shows its own pop-up too. To see notifications only in the notch, turn off banners per app in Windows Settings › System › Notifications."),
+
             Header("System HUDs", "What appears in the notch when you change volume or brightness."),
             Toggle("Volume HUD", () => h.VolumeHud, v => h.VolumeHud = v),
             Toggle("Replace the Windows volume flyout", () => h.ReplaceWindowsVolumeFlyout, v => h.ReplaceWindowsVolumeFlyout = v, Restart,

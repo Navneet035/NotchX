@@ -26,6 +26,23 @@ public sealed class AppSettings
     public CuelySettings Cuely { get; set; } = new();
     public DocumentSettings Documents { get; set; } = new();
     public ClockSettings Clock { get; set; } = new();
+    public NotificationSettings Notifications { get; set; } = new();
+}
+
+/// <summary>Other apps' notifications mirrored in the notch (Microsoft Store build only).</summary>
+public sealed class NotificationSettings
+{
+    /// <summary>Slide new notifications out of the notch.</summary>
+    public bool ShowIsland { get; set; } = true;
+    /// <summary>False shows only the app name and "New notification", for privacy.</summary>
+    public bool ShowText { get; set; } = true;
+    /// <summary>Unread count on the closed notch.</summary>
+    public bool UnreadOnPill { get; set; } = true;
+    /// <summary>No islands while Windows Do Not Disturb is on (they still count as unread).</summary>
+    public bool RespectDoNotDisturb { get; set; } = true;
+    public double Seconds { get; set; } = 6;
+    /// <summary>App names (as Windows shows them) that never appear in the notch.</summary>
+    public List<string> MutedApps { get; set; } = new();
 }
 
 public sealed class ClockSettings

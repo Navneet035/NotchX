@@ -61,6 +61,7 @@ public sealed class ModuleRegistry
         new HomeModule(),
         new NowPlayingModule(),
         new ClipboardModule(),
+        new NotificationsModule(),
         new ShelfModule(),
         new DocumentsModule(),
         new TimerModule(),
