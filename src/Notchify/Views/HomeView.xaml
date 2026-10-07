@@ -40,19 +40,23 @@
                     <Viewbox HorizontalAlignment="Left" StretchDirection="DownOnly" MaxHeight="52">
                         <TextBlock x:Name="Time" Style="{StaticResource Big}" FontSize="40" />
                     </Viewbox>
-                    <TextBlock x:Name="Date" Style="{StaticResource Caption}" FontSize="12" Margin="2,0,0,8" />
-                    <StackPanel Orientation="Horizontal" Margin="2,0,0,0">
+                    <TextBlock x:Name="Date" Style="{StaticResource Caption}" FontSize="12" Margin="2,0,0,8" TextTrimming="CharacterEllipsis" />
+                    <!-- A grid (not a horizontal stack) so the text gets the card's real width and wraps instead of running off the edge. -->
+                    <Grid Margin="2,0,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
                         <TextBlock Text="{Binding Weather.Icon}" FontSize="20" FontFamily="Segoe UI Emoji" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
-                        <StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource Title}" FontSize="13">
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Title}" FontSize="13" TextWrapping="Wrap" MaxHeight="36" TextTrimming="CharacterEllipsis">
                                 <Run Text="{Binding Weather.Temperature, Mode=OneWay}" /> <Run Text="{Binding Weather.Condition, Mode=OneWay}" FontWeight="Normal" />
                             </TextBlock>
                             <!-- High / low and the place on their own lines, so a narrow card doesn't cut them off. -->
-                            <TextBlock Style="{StaticResource Caption}" Text="{Binding Weather.Range, Mode=OneWay}" />
-                            <TextBlock Style="{StaticResource Caption}" Text="{Binding Weather.Place, Mode=OneWay}" Foreground="{DynamicResource FaintTextBrush}" />
-
+                            <TextBlock Style="{StaticResource Caption}" Text="{Binding Weather.Range, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Style="{StaticResource Caption}" Text="{Binding Weather.Place, Mode=OneWay}" Foreground="{DynamicResource FaintTextBrush}" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                    </StackPanel>
+                    </Grid>
                 </StackPanel>
             </Border>
 
@@ -63,6 +67,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <Grid>
@@ -90,6 +95,17 @@
                             <Button Style="{StaticResource BigIconButton}" Content="{Binding Media.PlayGlyph}" Click="Play_Click" Margin="10,0" />
                             <Button Style="{StaticResource IconButton}" Content="&#xE893;" Click="Next_Click" />
                         </StackPanel>
+                        <!-- System volume, so the music can be turned up or down right here. -->
+                        <Grid Grid.Row="3" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="28" />
+                            </Grid.ColumnDefinitions>
+                            <Button Style="{StaticResource IconButton}" Width="26" Height="26" FontSize="12" Content="{Binding Audio.VolumeGlyph}" Click="Mute_Click" ToolTip="Mute / unmute" />
+                            <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Audio.Volume, Mode=TwoWay}" VerticalAlignment="Center" Margin="4,0" ToolTip="Volume" />
+                            <TextBlock Grid.Column="2" Style="{StaticResource Caption}" Text="{Binding Audio.Volume, StringFormat={}{0:0}}" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
                     </Grid>
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="{Binding Media.HasSession, Converter={StaticResource NotVis}}">
                         <TextBlock Style="{StaticResource Icon}" Text="&#xE8D6;" FontSize="24" Foreground="{DynamicResource FaintTextBrush}" />
@@ -176,21 +192,18 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <ComboBox Tag="output" DisplayMemberPath="Name" ToolTip="Sound output" />
-                        <Button Grid.Column="1" Style="{StaticResource ChipButton}" Margin="6,0,0,0" Padding="9,5" Click="Lock_Click" ToolTip="Lock screen (Win+L)">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource Icon}" Text="&#xE72E;" FontSize="13" Margin="0,0,5,0" />
-                                <TextBlock Text="Lock" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
+                        <!-- Icon only, so the output picker keeps room for the device name in narrow cards. -->
+                        <Button Grid.Column="1" Style="{StaticResource IconButton}" Margin="4,0,0,0" Content="&#xE72E;" Click="Lock_Click" ToolTip="Lock screen (Win+L)" />
                     </Grid>
-                    <UniformGrid Rows="1">
-                        <ToggleButton Tag="caffeine" Style="{StaticResource IconToggle}" Content="&#xE945;" ToolTip="Keep awake" Click="Caffeine_Click" />
-                        <ToggleButton Tag="mic" Style="{StaticResource IconToggle}" Content="&#xEC54;" ToolTip="Mute microphone everywhere" Click="Mic_Click" />
-                        <ToggleButton Tag="hide" Style="{StaticResource IconToggle}" Content="&#xEA18;" ToolTip="Hide NotchX from screen capture" Click="Hide_Click" />
-                        <Button Style="{StaticResource IconButton}" Content="&#xE7A8;" ToolTip="Screen capture (copies to the clipboard)" Click="Capture_Click" />
-                        <Button Style="{StaticResource IconButton}" Content="&#xE790;" ToolTip="Colour eyedropper" Click="Eyedropper_Click" />
-                        <Button Style="{StaticResource IconButton}" Content="&#xE721;" ToolTip="Command palette" Click="Palette_Click" />
-                    </UniformGrid>
+                    <!-- Wraps onto a second line in a narrow card instead of running off the edge. -->
+                    <WrapPanel HorizontalAlignment="Center">
+                        <ToggleButton Tag="caffeine" Style="{StaticResource IconToggle}" Content="&#xE945;" ToolTip="Keep awake" Click="Caffeine_Click" Margin="2,0" />
+                        <ToggleButton Tag="mic" Style="{StaticResource IconToggle}" Content="&#xEC54;" ToolTip="Mute microphone everywhere" Click="Mic_Click" Margin="2,0" />
+                        <ToggleButton Tag="hide" Style="{StaticResource IconToggle}" Content="&#xEA18;" ToolTip="Hide NotchX from screen capture" Click="Hide_Click" Margin="2,0" />
+                        <Button Style="{StaticResource IconButton}" Content="&#xE7A8;" ToolTip="Screen capture (copies to the clipboard)" Click="Capture_Click" Margin="2,0" />
+                        <Button Style="{StaticResource IconButton}" Content="&#xE790;" ToolTip="Colour eyedropper" Click="Eyedropper_Click" Margin="2,0" />
+                        <Button Style="{StaticResource IconButton}" Content="&#xE721;" ToolTip="Command palette" Click="Palette_Click" Margin="2,0" />
+                    </WrapPanel>
                 </StackPanel>
             </Border>
 

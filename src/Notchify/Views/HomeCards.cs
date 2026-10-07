@@ -122,7 +122,9 @@ public static class HomeCards
             Margin = new Thickness(10, 0, 0, 0),
             Children = { Bound(w, nameof(WeatherService.Condition), "Title", 13), Bound(w, nameof(WeatherService.Range), "Caption"), Bound(w, nameof(WeatherService.Place), "Caption") },
         };
-        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { icon, temp, info } };
+        // Columns (not a horizontal stack) so the condition and place get the space that's left and trim with "…".
+        var row = Columns((icon, Auto), (temp, Auto), (info, Star()));
+        row.VerticalAlignment = VerticalAlignment.Center;
         var card = CardOf(row);
         card.MouseLeftButtonUp += (_, _) => _ = w.RefreshAsync();
         card.ToolTip = "Click to refresh · set your city in Settings › Weather";
@@ -153,11 +155,7 @@ public static class HomeCards
         b.PropertyChanged += (_, _) => Render();
         Notch.Bluetooth.Devices.CollectionChanged += (_, _) => Render();
         Render();
-        var top = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Children = { glyph, new StackPanel { Margin = new Thickness(8, 0, 0, 0), Children = { big, state } } },
-        };
+        var top = Columns((glyph, Auto), (new StackPanel { Margin = new Thickness(8, 0, 0, 0), Children = { big, state } }, Star()));
         glyph.VerticalAlignment = VerticalAlignment.Center;
         var stack = new StackPanel { Children = { top, devices } };
         devices.Margin = new Thickness(0, 6, 0, 0);
@@ -394,6 +392,7 @@ public static class HomeCards
     {
         var sp = Notch.Spaces;
         var name = Bound(sp, nameof(SpacesService.Name), "Title", 15);
+        name.TextTrimming = TextTrimming.CharacterEllipsis;
         var pos = Bound(sp, nameof(SpacesService.Position), "Caption");
         var info = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { name, pos } };
         var buttons = new StackPanel
@@ -408,7 +407,23 @@ public static class HomeCards
                 Small(Glyphs.Apps, "Task view (Win+Tab)", () => { Notch.Shell.Collapse(); sp.TaskView(); }),
             },
         };
-        var card = CardOf(Columns((Icon(Glyphs.Apps, 18), Px(30)), (info, Star()), (buttons, Auto)));
+        // Wide: icon · name · buttons in a row. Narrow: the buttons move under the name so it isn't squeezed to "D…".
+        var icon = Icon(Glyphs.Apps, 18);
+        icon.Width = 30;
+        icon.VerticalAlignment = VerticalAlignment.Center;
+        DockPanel.SetDock(icon, Dock.Left);
+        DockPanel.SetDock(buttons, Dock.Right);
+        var layout = new DockPanel { Children = { icon, buttons, info } };
+        var card = CardOf(layout);
+        // Keyed off the card's own size (set by the Home grid), not the content's, so scaling can't flip it back and forth.
+        card.SizeChanged += (_, e) =>
+        {
+            var narrow = e.NewSize.Width < 250;
+            DockPanel.SetDock(buttons, narrow ? Dock.Bottom : Dock.Right);
+            buttons.HorizontalAlignment = narrow ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+            buttons.Margin = narrow ? new Thickness(-6, 4, 0, 0) : new Thickness(0);
+            icon.Visibility = narrow ? Visibility.Collapsed : Visibility.Visible;
+        };
         WhileVisible(card, sp.Acquire, sp.Release);
         return card;
     }
@@ -504,9 +519,15 @@ public static class HomeCards
         title.VerticalAlignment = VerticalAlignment.Center;
         title.Margin = new Thickness(2, 0, 0, 0);
         var all = Small(Glyphs.TaskView, "All desktops", () => Notch.Shell.OpenTab("desktops"));
+        var prev = Small(Glyphs.Left, "Previous desktop (Win+Ctrl+←)", Notch.Spaces.Previous);
+        var next = Small(Glyphs.Right, "Next desktop (Win+Ctrl+→)", Notch.Spaces.Next);
         var head = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
         DockPanel.SetDock(all, Dock.Right);
+        DockPanel.SetDock(next, Dock.Right);
+        DockPanel.SetDock(prev, Dock.Right);
         head.Children.Add(all);
+        head.Children.Add(next);
+        head.Children.Add(prev);
         head.Children.Add(title);
         var icons = new WrapPanel();
         var empty = Faint("Nothing open on this desktop");

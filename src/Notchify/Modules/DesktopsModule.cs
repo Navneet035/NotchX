@@ -46,6 +46,8 @@ public sealed class DesktopsModule : NotchModule
                 group,
                 Chip("New desktop", (_, _) => Notch.Spaces.New(), Glyphs.Add),
                 Chip("Task view", (_, _) => { Notch.Shell.Collapse(); Notch.Spaces.TaskView(); }, Glyphs.TaskView),
+                IconButton(Glyphs.Left, "Previous desktop (Win+Ctrl+←)", (_, _) => Notch.Spaces.Previous()),
+                IconButton(Glyphs.Right, "Next desktop (Win+Ctrl+→)", (_, _) => Notch.Spaces.Next()),
             },
         };
         foreach (Button b in buttons.Children.OfType<Button>()) b.Margin = new Thickness(6, 0, 0, 0);

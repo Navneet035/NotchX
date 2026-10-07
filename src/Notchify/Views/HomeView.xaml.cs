@@ -37,7 +37,7 @@ public partial class HomeView : UserControl
 
         // XAML-defined cards, keyed by their Tag (= card type).
         foreach (var card in Pool.Children.OfType<FrameworkElement>().ToList()) _cards[(string)card.Tag] = card;
-        foreach (var card in _cards.Values) Collect(card);
+        foreach (var card in _cards.Values) { Collect(card); FitBox.Wrap(card, card.Tag as string); }
 
         _clock.Tick += (_, _) => Tick();
         _bluetooth.Tick += (_, _) => { if (IsShown("bluetooth")) _ = Notch.Bluetooth.RefreshPairedAsync(); };
@@ -113,6 +113,7 @@ public partial class HomeView : UserControl
         try { el = HomeCards.Create(type); }
         catch (Exception ex) { Log.Error($"home card {type}", ex); el = null; }
         if (el == null) return null;
+        FitBox.Wrap(el, type);
         el.Tag = type;
         _cards[type] = el;
         return el;
