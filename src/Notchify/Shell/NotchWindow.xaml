@@ -146,7 +146,8 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel x:Name="HeaderRight" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Height="32" Margin="10,0,0,0">
+                            <StackPanel x:Name="HeaderRight" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Height="32" Margin="10,0,0,0"
+                                        Panel.ZIndex="1" SizeChanged="HeaderRight_SizeChanged">
                                 <Button x:Name="AddCardButton" Style="{StaticResource ChipButton}" Content="+ Add card" Visibility="Collapsed"
                                         Margin="0,0,6,0" Click="AddCard_Click" ToolTip="Add a card to Home" />
                                 <Button x:Name="DoneButton" Style="{StaticResource AccentButton}" Content="Done" Visibility="Collapsed"
@@ -169,10 +170,11 @@
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
-                            <!-- Tabs wrap onto more rows (Wrap setting, and always while editing the layout). -->
-                            <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled" x:Name="TabScroller"
+                            <!-- Tabs wrap onto more rows (Wrap setting, and always while editing the layout). They span the whole
+                                 header: the first row leaves room for the clock and buttons, later rows run underneath them. -->
+                            <ScrollViewer Grid.Column="0" Grid.ColumnSpan="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled" x:Name="TabScroller"
                                           SizeChanged="TabScroller_SizeChanged">
-                                <WrapPanel x:Name="TabStrip" Orientation="Horizontal" VerticalAlignment="Top" />
+                                <c:TabFlowPanel x:Name="TabStrip" VerticalAlignment="Top" />
                             </ScrollViewer>
                         </Grid>
 

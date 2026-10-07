@@ -347,6 +347,7 @@ public partial class NotchWindow : Window, INotchShell
     {
         _collapseTimer.Stop();
         _leaveWatch.Stop();
+        StopOutsideClickWatch();
         _peeking = false;
         LayoutEditor.IsEditing = false;
         if (Notch.Hub.Current != null) GoIsland(Notch.Hub.Current);
@@ -664,14 +665,22 @@ public partial class NotchWindow : Window, INotchShell
         _awaySince = null;
         _seenInside = CursorOverPill();
         _leaveWatch.Start();
+        StartOutsideClickWatch();
     }
+
+    /// <summary>
+    /// Something inside really has the mouse (a slider or scrollbar being dragged). WPF can leave Mouse.Captured
+    /// set after the button is released, which used to keep the notch open for good.
+    /// </summary>
+    private static bool MouseHeld() =>
+        Mouse.Captured != null && ((Native.GetAsyncKeyState(0x01) & 0x8000) != 0 || (Native.GetAsyncKeyState(0x02) & 0x8000) != 0);
 
     private void LeaveWatch_Tick(object? sender, EventArgs e)
     {
-        if (_state != NotchState.Expanded) { _leaveWatch.Stop(); return; }
+        if (_state != NotchState.Expanded) { _leaveWatch.Stop(); StopOutsideClickWatch(); return; }
         var b = SettingsStore.Current.Behavior;
         var holding = !b.AutoCollapse || PinToggle.IsChecked == true || _scripted || LayoutEditor.IsEditing || _dragging
-            || Mouse.Captured != null || (IsActive && Keyboard.FocusedElement is TextBox);
+            || MouseHeld() || (IsActive && Keyboard.FocusedElement is TextBox);
         if (holding || CursorOverPill())
         {
             if (!holding) _seenInside = true;
@@ -689,7 +698,56 @@ public partial class NotchWindow : Window, INotchShell
         if (_dragging || _scripted || CursorOverPill() || _state != NotchState.Expanded) return;
         // Don't yank the panel away while the user is typing in it or a popup (combo box) is open.
         if (IsActive && Keyboard.FocusedElement is TextBox) return;
-        if (Mouse.Captured != null) return;
+        if (MouseHeld()) return;
+        Collapse();
+    }
+
+    // ---------------- Click outside to close ----------------
+    // While open, a low-level mouse hook watches for a click anywhere else on screen and closes the notch,
+    // whatever the hover logic thinks. Clicks on NotchX's own pop-ups (menus, drop-downs, Settings) don't count.
+
+    private IntPtr _clickHook;
+    private Native.HookProc? _clickProc;
+
+    private void StartOutsideClickWatch()
+    {
+        if (_clickHook != IntPtr.Zero) return;
+        _clickProc = OutsideClickProc;
+        _clickHook = Native.SetWindowsHookEx(Native.WH_MOUSE_LL, _clickProc, Native.GetModuleHandle(null), 0);
+    }
+
+    private void StopOutsideClickWatch()
+    {
+        if (_clickHook == IntPtr.Zero) return;
+        Native.UnhookWindowsHookEx(_clickHook);
+        _clickHook = IntPtr.Zero;
+    }
+
+    private IntPtr OutsideClickProc(int code, IntPtr wParam, IntPtr lParam)
+    {
+        // Runs for every mouse event system-wide: only note button presses and get out.
+        if (code >= 0 && (int)wParam is Native.WM_LBUTTONDOWN or Native.WM_RBUTTONDOWN or 0x0207 /* middle */)
+        {
+            var pt = System.Runtime.InteropServices.Marshal.PtrToStructure<Native.MSLLHOOKSTRUCT>(lParam).pt;
+            Dispatcher.BeginInvoke(() => OnClickAnywhere(pt));
+        }
+        return Native.CallNextHookEx(_clickHook, code, wParam, lParam);
+    }
+
+    private void OnClickAnywhere(Native.POINT pt)
+    {
+        if (_state != NotchState.Expanded) { StopOutsideClickWatch(); return; }
+        if (PinToggle.IsChecked == true || _scripted || _dragging) return;
+        try
+        {
+            var topLeft = Pill.PointToScreen(new Point(0, 0));
+            var bottomRight = Pill.PointToScreen(new Point(Pill.ActualWidth, Pill.ActualHeight));
+            if (pt.X >= topLeft.X && pt.X <= bottomRight.X && pt.Y >= topLeft.Y && pt.Y <= bottomRight.Y) return;
+        }
+        catch { return; }
+        // One of our own windows (a menu, a drop-down list, Settings, the palette): not "outside".
+        var hit = Native.WindowFromPoint(pt);
+        if (hit != IntPtr.Zero && Native.GetWindowThreadProcessId(hit, out var pid) != 0 && pid == (uint)Environment.ProcessId) return;
         Collapse();
     }
 
@@ -785,6 +843,8 @@ public partial class NotchWindow : Window, INotchShell
         // One fixed row with "More ▾", or as many rows as the tabs need (always while editing, so every tab can be arranged).
         var wrap = LayoutEditor.IsEditing || appearance.TabOverflow != "Menu";
         Header.Height = wrap ? double.NaN : _rowHeight;
+        // Edit-layout chips are shorter than the Add card / Done buttons: keep the rows beside those clear too.
+        TabStrip.ReserveHeight = LayoutEditor.IsEditing ? HeaderRight.ActualHeight : 0;
         if (LayoutEditor.IsEditing) { BuildEditableTabs(); return; }
         var index = 1;
         foreach (var m in Notch.Modules.Tabs)
@@ -856,6 +916,14 @@ public partial class NotchWindow : Window, INotchShell
         if (e.WidthChanged) LayoutTabs();
     }
 
+    /// <summary>The first row of tabs stops where the clock and buttons start.</summary>
+    private void HeaderRight_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        TabStrip.FirstRowReserve = HeaderRight.ActualWidth + HeaderRight.Margin.Left;
+        TabStrip.ReserveHeight = LayoutEditor.IsEditing ? HeaderRight.ActualHeight : 0;
+        if (e.WidthChanged) LayoutTabs();
+    }
+
     private double _rowHeight = 44;
     private double _headerExtra;
 
@@ -881,7 +949,7 @@ public partial class NotchWindow : Window, INotchShell
             return;
         }
         // A couple of pixels' slack so rounding never pushes the last tab onto a second row.
-        var available = TabScroller.ActualWidth - 2;
+        var available = TabScroller.ActualWidth - TabStrip.FirstRowReserve - 2;
         if (available <= 0) return;
 
         var infinite = new Size(double.PositiveInfinity, double.PositiveInfinity);
@@ -1022,6 +1090,70 @@ public partial class NotchWindow : Window, INotchShell
         else if (_pinnedBeforeEdit is { } was) { PinToggle.IsChecked = was; _pinnedBeforeEdit = null; }
         RebuildTabs();
         UpdateEditButtons();
+        ShowResizeHandles(editing);
+    }
+
+    // ---------------- Resize the open panel (edit layout) ----------------
+    // Drag the sides, bottom or bottom corners. The notch stays centred, so a side moves both sides at once.
+
+    private Grid? _resizeHandles;
+
+    private void ShowResizeHandles(bool show)
+    {
+        if (show && _resizeHandles == null && ExpandedLayer.Parent is Grid host)
+        {
+            _resizeHandles = new Grid { Visibility = Visibility.Collapsed };
+            Panel.SetZIndex(_resizeHandles, 10);
+            _resizeHandles.Children.Add(Handle(HorizontalAlignment.Right, VerticalAlignment.Stretch, 8, double.NaN, Cursors.SizeWE, 2, 0, "Drag to make the panel wider or narrower"));
+            _resizeHandles.Children.Add(Handle(HorizontalAlignment.Left, VerticalAlignment.Stretch, 8, double.NaN, Cursors.SizeWE, -2, 0, "Drag to make the panel wider or narrower"));
+            _resizeHandles.Children.Add(Handle(HorizontalAlignment.Stretch, VerticalAlignment.Bottom, double.NaN, 8, Cursors.SizeNS, 0, 1, "Drag to make the panel taller or shorter"));
+            _resizeHandles.Children.Add(Handle(HorizontalAlignment.Right, VerticalAlignment.Bottom, 18, 18, Cursors.SizeNWSE, 2, 1, "Drag to resize the panel"));
+            _resizeHandles.Children.Add(Handle(HorizontalAlignment.Left, VerticalAlignment.Bottom, 18, 18, Cursors.SizeNESW, -2, 1, "Drag to resize the panel"));
+            // A visible grip, so it's obvious the panel can be resized.
+            var grip = Handle(HorizontalAlignment.Center, VerticalAlignment.Bottom, 56, 14, Cursors.SizeNS, 0, 1, "Drag to make the panel taller or shorter");
+            grip.Template = GripTemplate();
+            _resizeHandles.Children.Add(grip);
+            host.Children.Add(_resizeHandles);
+        }
+        if (_resizeHandles != null) _resizeHandles.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <param name="dw">Width change per pixel dragged across (2 = both sides move, as the notch stays centred).</param>
+    /// <param name="dh">Height change per pixel dragged down.</param>
+    private System.Windows.Controls.Primitives.Thumb Handle(HorizontalAlignment h, VerticalAlignment v, double width, double height, Cursor cursor, double dw, double dh, string tip)
+    {
+        var thumb = new System.Windows.Controls.Primitives.Thumb
+        {
+            HorizontalAlignment = h,
+            VerticalAlignment = v,
+            Width = width,
+            Height = height,
+            Cursor = cursor,
+            ToolTip = tip,
+            Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(
+                "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Thumb'><Border Background='Transparent' /></ControlTemplate>"),
+        };
+        thumb.DragDelta += (_, e) => ResizePanel(e.HorizontalChange * dw, e.VerticalChange * dh);
+        thumb.DragCompleted += (_, _) => SettingsStore.NotifyChanged(); // save, and let Settings' sliders catch up
+        return thumb;
+    }
+
+    private static ControlTemplate GripTemplate() => (ControlTemplate)System.Windows.Markup.XamlReader.Parse(
+        "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Thumb'>" +
+        "<Border Background='Transparent'><Border Width='40' Height='4' CornerRadius='2' Background='{DynamicResource AccentBrush}' VerticalAlignment='Center' /></Border>" +
+        "</ControlTemplate>");
+
+    private void ResizePanel(double dw, double dh)
+    {
+        var a = SettingsStore.Current.Appearance;
+        var screen = System.Windows.Forms.Screen.FromHandle(_hwnd).WorkingArea;
+        var scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        var maxW = screen.Width / scale - 60;
+        var maxH = screen.Height / scale * 0.85;
+        a.ExpandedWidth = Math.Round(Math.Clamp(a.ExpandedWidth + dw, 460, Math.Max(460, maxW)));
+        a.ExpandedHeight = Math.Round(Math.Clamp(a.ExpandedHeight + dh, 180, Math.Max(180, maxH)));
+        PositionWindow();      // the window grows with the panel
+        RefreshSize(animate: false);
     }
 
     // ---------------- Right-click menu ----------------
